@@ -1,0 +1,713 @@
+{
+  "method": "Per-beat TTS (avocado_v2:briggs, speed 130 after first pass at 100 was 39.552s raw). Each beat trimmed of leading/trailing silence (<-38dB approx, 0.06s pad), concatenated with 0.14s gaps, 0.25s head, 0.45s tail at 48kHz mono. Word timings interpolated within each beat proportional to word character length \u2014 trial approximation, not STT.",
+  "total_seconds": 29.772,
+  "beats": [
+    {
+      "beat": 1,
+      "text": "Twelve cowboys nearly bounced a river bridge into the water, just by walking in perfect time.",
+      "start": 0.25,
+      "end": 3.977,
+      "duration": 3.727
+    },
+    {
+      "beat": 2,
+      "text": "Texas, eighteen eighty-three. Eli, their leader, was proud of his rhythm.",
+      "start": 4.117,
+      "end": 7.622,
+      "duration": 3.505
+    },
+    {
+      "beat": 3,
+      "text": "He crossed first. Tap, tap, tap.",
+      "start": 7.762,
+      "end": 9.103,
+      "duration": 1.341
+    },
+    {
+      "beat": 4,
+      "text": "Behind him, every boot landed together.",
+      "start": 9.243,
+      "end": 11.365,
+      "duration": 2.122
+    },
+    {
+      "beat": 5,
+      "text": "The bridge began to bounce, gently, then like a clothesline in a storm.",
+      "start": 11.505,
+      "end": 14.873,
+      "duration": 3.368
+    },
+    {
+      "beat": 6,
+      "text": "A chain sang. A plank jumped. Eli's hat sailed into the river.",
+      "start": 15.013,
+      "end": 18.448,
+      "duration": 3.435
+    },
+    {
+      "beat": 7,
+      "text": "Luckily, the cowboys stayed dry. Unluckily, the fish kept the hat.",
+      "start": 18.588,
+      "end": 21.566,
+      "duration": 2.979
+    },
+    {
+      "beat": 8,
+      "text": "A steady beat feeds a bounce, like pushing a swing at the same moment, every time.",
+      "start": 21.706,
+      "end": 25.318,
+      "duration": 3.611
+    },
+    {
+      "beat": 9,
+      "text": "So cowboys learned to cross out of step. Eli still keeps perfect time, on dry land.",
+      "start": 25.458,
+      "end": 29.322,
+      "duration": 3.865
+    }
+  ],
+  "words": [
+    {
+      "word": "Twelve",
+      "start": 0.25,
+      "end": 0.534,
+      "beat": 1
+    },
+    {
+      "word": "cowboys",
+      "start": 0.534,
+      "end": 0.858,
+      "beat": 1
+    },
+    {
+      "word": "nearly",
+      "start": 0.858,
+      "end": 1.141,
+      "beat": 1
+    },
+    {
+      "word": "bounced",
+      "start": 1.141,
+      "end": 1.465,
+      "beat": 1
+    },
+    {
+      "word": "a",
+      "start": 1.465,
+      "end": 1.546,
+      "beat": 1
+    },
+    {
+      "word": "river",
+      "start": 1.546,
+      "end": 1.789,
+      "beat": 1
+    },
+    {
+      "word": "bridge",
+      "start": 1.789,
+      "end": 2.073,
+      "beat": 1
+    },
+    {
+      "word": "into",
+      "start": 2.073,
+      "end": 2.276,
+      "beat": 1
+    },
+    {
+      "word": "the",
+      "start": 2.276,
+      "end": 2.438,
+      "beat": 1
+    },
+    {
+      "word": "water",
+      "start": 2.438,
+      "end": 2.681,
+      "beat": 1
+    },
+    {
+      "word": "just",
+      "start": 2.681,
+      "end": 2.883,
+      "beat": 1
+    },
+    {
+      "word": "by",
+      "start": 2.883,
+      "end": 3.005,
+      "beat": 1
+    },
+    {
+      "word": "walking",
+      "start": 3.005,
+      "end": 3.329,
+      "beat": 1
+    },
+    {
+      "word": "in",
+      "start": 3.329,
+      "end": 3.45,
+      "beat": 1
+    },
+    {
+      "word": "perfect",
+      "start": 3.45,
+      "end": 3.774,
+      "beat": 1
+    },
+    {
+      "word": "time",
+      "start": 3.774,
+      "end": 3.977,
+      "beat": 1
+    },
+    {
+      "word": "Texas",
+      "start": 4.117,
+      "end": 4.422,
+      "beat": 2
+    },
+    {
+      "word": "eighteen",
+      "start": 4.422,
+      "end": 4.879,
+      "beat": 2
+    },
+    {
+      "word": "eighty-three",
+      "start": 4.879,
+      "end": 5.539,
+      "beat": 2
+    },
+    {
+      "word": "Eli",
+      "start": 5.539,
+      "end": 5.743,
+      "beat": 2
+    },
+    {
+      "word": "their",
+      "start": 5.743,
+      "end": 6.047,
+      "beat": 2
+    },
+    {
+      "word": "leader",
+      "start": 6.047,
+      "end": 6.403,
+      "beat": 2
+    },
+    {
+      "word": "was",
+      "start": 6.403,
+      "end": 6.606,
+      "beat": 2
+    },
+    {
+      "word": "proud",
+      "start": 6.606,
+      "end": 6.911,
+      "beat": 2
+    },
+    {
+      "word": "of",
+      "start": 6.911,
+      "end": 7.063,
+      "beat": 2
+    },
+    {
+      "word": "his",
+      "start": 7.063,
+      "end": 7.266,
+      "beat": 2
+    },
+    {
+      "word": "rhythm",
+      "start": 7.266,
+      "end": 7.622,
+      "beat": 2
+    },
+    {
+      "word": "He",
+      "start": 7.762,
+      "end": 7.901,
+      "beat": 3
+    },
+    {
+      "word": "crossed",
+      "start": 7.901,
+      "end": 8.271,
+      "beat": 3
+    },
+    {
+      "word": "first",
+      "start": 8.271,
+      "end": 8.548,
+      "beat": 3
+    },
+    {
+      "word": "Tap",
+      "start": 8.548,
+      "end": 8.733,
+      "beat": 3
+    },
+    {
+      "word": "tap",
+      "start": 8.733,
+      "end": 8.918,
+      "beat": 3
+    },
+    {
+      "word": "tap",
+      "start": 8.918,
+      "end": 9.103,
+      "beat": 3
+    },
+    {
+      "word": "Behind",
+      "start": 9.243,
+      "end": 9.634,
+      "beat": 4
+    },
+    {
+      "word": "him",
+      "start": 9.634,
+      "end": 9.857,
+      "beat": 4
+    },
+    {
+      "word": "every",
+      "start": 9.857,
+      "end": 10.192,
+      "beat": 4
+    },
+    {
+      "word": "boot",
+      "start": 10.192,
+      "end": 10.472,
+      "beat": 4
+    },
+    {
+      "word": "landed",
+      "start": 10.472,
+      "end": 10.862,
+      "beat": 4
+    },
+    {
+      "word": "together",
+      "start": 10.862,
+      "end": 11.365,
+      "beat": 4
+    },
+    {
+      "word": "The",
+      "start": 11.505,
+      "end": 11.7,
+      "beat": 5
+    },
+    {
+      "word": "bridge",
+      "start": 11.7,
+      "end": 12.042,
+      "beat": 5
+    },
+    {
+      "word": "began",
+      "start": 12.042,
+      "end": 12.335,
+      "beat": 5
+    },
+    {
+      "word": "to",
+      "start": 12.335,
+      "end": 12.481,
+      "beat": 5
+    },
+    {
+      "word": "bounce",
+      "start": 12.481,
+      "end": 12.823,
+      "beat": 5
+    },
+    {
+      "word": "gently",
+      "start": 12.823,
+      "end": 13.165,
+      "beat": 5
+    },
+    {
+      "word": "then",
+      "start": 13.165,
+      "end": 13.409,
+      "beat": 5
+    },
+    {
+      "word": "like",
+      "start": 13.409,
+      "end": 13.653,
+      "beat": 5
+    },
+    {
+      "word": "a",
+      "start": 13.653,
+      "end": 13.75,
+      "beat": 5
+    },
+    {
+      "word": "clothesline",
+      "start": 13.75,
+      "end": 14.336,
+      "beat": 5
+    },
+    {
+      "word": "in",
+      "start": 14.336,
+      "end": 14.483,
+      "beat": 5
+    },
+    {
+      "word": "a",
+      "start": 14.483,
+      "end": 14.58,
+      "beat": 5
+    },
+    {
+      "word": "storm",
+      "start": 14.58,
+      "end": 14.873,
+      "beat": 5
+    },
+    {
+      "word": "A",
+      "start": 15.013,
+      "end": 15.128,
+      "beat": 6
+    },
+    {
+      "word": "chain",
+      "start": 15.128,
+      "end": 15.471,
+      "beat": 6
+    },
+    {
+      "word": "sang",
+      "start": 15.471,
+      "end": 15.757,
+      "beat": 6
+    },
+    {
+      "word": "A",
+      "start": 15.757,
+      "end": 15.872,
+      "beat": 6
+    },
+    {
+      "word": "plank",
+      "start": 15.872,
+      "end": 16.215,
+      "beat": 6
+    },
+    {
+      "word": "jumped",
+      "start": 16.215,
+      "end": 16.616,
+      "beat": 6
+    },
+    {
+      "word": "Eli's",
+      "start": 16.616,
+      "end": 16.96,
+      "beat": 6
+    },
+    {
+      "word": "hat",
+      "start": 16.96,
+      "end": 17.188,
+      "beat": 6
+    },
+    {
+      "word": "sailed",
+      "start": 17.188,
+      "end": 17.589,
+      "beat": 6
+    },
+    {
+      "word": "into",
+      "start": 17.589,
+      "end": 17.875,
+      "beat": 6
+    },
+    {
+      "word": "the",
+      "start": 17.875,
+      "end": 18.104,
+      "beat": 6
+    },
+    {
+      "word": "river",
+      "start": 18.104,
+      "end": 18.448,
+      "beat": 6
+    },
+    {
+      "word": "Luckily",
+      "start": 18.588,
+      "end": 18.966,
+      "beat": 7
+    },
+    {
+      "word": "the",
+      "start": 18.966,
+      "end": 19.155,
+      "beat": 7
+    },
+    {
+      "word": "cowboys",
+      "start": 19.155,
+      "end": 19.533,
+      "beat": 7
+    },
+    {
+      "word": "stayed",
+      "start": 19.533,
+      "end": 19.864,
+      "beat": 7
+    },
+    {
+      "word": "dry",
+      "start": 19.864,
+      "end": 20.053,
+      "beat": 7
+    },
+    {
+      "word": "Unluckily",
+      "start": 20.053,
+      "end": 20.526,
+      "beat": 7
+    },
+    {
+      "word": "the",
+      "start": 20.526,
+      "end": 20.715,
+      "beat": 7
+    },
+    {
+      "word": "fish",
+      "start": 20.715,
+      "end": 20.951,
+      "beat": 7
+    },
+    {
+      "word": "kept",
+      "start": 20.951,
+      "end": 21.188,
+      "beat": 7
+    },
+    {
+      "word": "the",
+      "start": 21.188,
+      "end": 21.377,
+      "beat": 7
+    },
+    {
+      "word": "hat",
+      "start": 21.377,
+      "end": 21.566,
+      "beat": 7
+    },
+    {
+      "word": "A",
+      "start": 21.706,
+      "end": 21.796,
+      "beat": 8
+    },
+    {
+      "word": "steady",
+      "start": 21.796,
+      "end": 22.112,
+      "beat": 8
+    },
+    {
+      "word": "beat",
+      "start": 22.112,
+      "end": 22.338,
+      "beat": 8
+    },
+    {
+      "word": "feeds",
+      "start": 22.338,
+      "end": 22.609,
+      "beat": 8
+    },
+    {
+      "word": "a",
+      "start": 22.609,
+      "end": 22.699,
+      "beat": 8
+    },
+    {
+      "word": "bounce",
+      "start": 22.699,
+      "end": 23.015,
+      "beat": 8
+    },
+    {
+      "word": "like",
+      "start": 23.015,
+      "end": 23.241,
+      "beat": 8
+    },
+    {
+      "word": "pushing",
+      "start": 23.241,
+      "end": 23.602,
+      "beat": 8
+    },
+    {
+      "word": "a",
+      "start": 23.602,
+      "end": 23.693,
+      "beat": 8
+    },
+    {
+      "word": "swing",
+      "start": 23.693,
+      "end": 23.964,
+      "beat": 8
+    },
+    {
+      "word": "at",
+      "start": 23.964,
+      "end": 24.099,
+      "beat": 8
+    },
+    {
+      "word": "the",
+      "start": 24.099,
+      "end": 24.28,
+      "beat": 8
+    },
+    {
+      "word": "same",
+      "start": 24.28,
+      "end": 24.505,
+      "beat": 8
+    },
+    {
+      "word": "moment",
+      "start": 24.505,
+      "end": 24.821,
+      "beat": 8
+    },
+    {
+      "word": "every",
+      "start": 24.821,
+      "end": 25.092,
+      "beat": 8
+    },
+    {
+      "word": "time",
+      "start": 25.092,
+      "end": 25.318,
+      "beat": 8
+    },
+    {
+      "word": "So",
+      "start": 25.458,
+      "end": 25.601,
+      "beat": 9
+    },
+    {
+      "word": "cowboys",
+      "start": 25.601,
+      "end": 25.983,
+      "beat": 9
+    },
+    {
+      "word": "learned",
+      "start": 25.983,
+      "end": 26.364,
+      "beat": 9
+    },
+    {
+      "word": "to",
+      "start": 26.364,
+      "end": 26.507,
+      "beat": 9
+    },
+    {
+      "word": "cross",
+      "start": 26.507,
+      "end": 26.794,
+      "beat": 9
+    },
+    {
+      "word": "out",
+      "start": 26.794,
+      "end": 26.985,
+      "beat": 9
+    },
+    {
+      "word": "of",
+      "start": 26.985,
+      "end": 27.128,
+      "beat": 9
+    },
+    {
+      "word": "step",
+      "start": 27.128,
+      "end": 27.366,
+      "beat": 9
+    },
+    {
+      "word": "Eli",
+      "start": 27.366,
+      "end": 27.557,
+      "beat": 9
+    },
+    {
+      "word": "still",
+      "start": 27.557,
+      "end": 27.843,
+      "beat": 9
+    },
+    {
+      "word": "keeps",
+      "start": 27.843,
+      "end": 28.129,
+      "beat": 9
+    },
+    {
+      "word": "perfect",
+      "start": 28.129,
+      "end": 28.511,
+      "beat": 9
+    },
+    {
+      "word": "time",
+      "start": 28.511,
+      "end": 28.75,
+      "beat": 9
+    },
+    {
+      "word": "on",
+      "start": 28.75,
+      "end": 28.893,
+      "beat": 9
+    },
+    {
+      "word": "dry",
+      "start": 28.893,
+      "end": 29.083,
+      "beat": 9
+    },
+    {
+      "word": "land",
+      "start": 29.083,
+      "end": 29.322,
+      "beat": 9
+    }
+  ]
+}
