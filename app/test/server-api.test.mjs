@@ -217,3 +217,166 @@ test("HTTP server preserves all legacy contracts, supports NDJSON streaming, and
     await env.close();
   }
 });
+
+test("OOS-03 golden contracts: literal prompts, token budgets, clearKey, concurrent settings saves, and parallel TTS writes", async () => {
+  const capturedBodies = [];
+  const fetchImpl = async (url, init = {}) => {
+    const u = new URL(url);
+    if (u.pathname.endsWith("/models")) {
+      return new Response(JSON.stringify({ models: MOCK_MODELS }), { status: 200 });
+    }
+    const model = decodeURIComponent(/\/models\/([^:]+):generateContent/.exec(u.pathname)?.[1] || "");
+    const body = JSON.parse(init.body || "{}");
+    capturedBodies.push({ model, body });
+
+    if (body.generationConfig?.responseModalities?.includes("AUDIO")) {
+      const pcm = Buffer.alloc(3600, 3);
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            { content: { parts: [{ inlineData: { mimeType: "audio/L16", data: pcm.toString("base64") } }] } },
+          ],
+        }),
+        { status: 200 },
+      );
+    }
+    const textPrompt = body.contents?.[0]?.parts?.[0]?.text || "";
+    if (textPrompt.includes("Reply with exactly: OK")) {
+      return new Response(
+        JSON.stringify({ candidates: [{ content: { parts: [{ text: "OK" }] } }] }),
+        { status: 200 },
+      );
+    }
+    if (textPrompt.includes("visual QA checker")) {
+      return new Response(
+        JSON.stringify({
+          candidates: [
+            { content: { parts: [{ text: '{"verdict":"PASS","issues":[],"summary":"Good frame."}' }] } },
+          ],
+        }),
+        { status: 200 },
+      );
+    }
+    return new Response(
+      JSON.stringify({
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: '{"title":"Golden Prompt Check","beats":[{"text":"One steady narrator line.","estSec":3.5}],"totalWords":4}',
+                },
+              ],
+            },
+          },
+        ],
+      }),
+      { status: 200 },
+    );
+  };
+
+  const env = await startEphemeralStudio(fetchImpl);
+  try {
+    // 1. Concurrent POST /api/settings across multiple providers & fields
+    await Promise.all([
+      fetch(`${env.baseUrl}/api/settings`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: "gemini", fields: { apiKey: "AIzaConcurrentKeyAlpha12345" } }),
+      }),
+      fetch(`${env.baseUrl}/api/settings`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: "openai", fields: { apiKey: "sk-openai-test-99999" } }),
+      }),
+      fetch(`${env.baseUrl}/api/settings`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: "gemini", fields: { modelPolicy: "balanced" } }),
+      }),
+    ]);
+
+    const afterConcurrent = await fetch(`${env.baseUrl}/api/settings`).then((r) => r.json());
+    assert.equal(afterConcurrent.ok, true);
+    assert.equal(afterConcurrent.providers.gemini.hasKey, true);
+    assert.equal(afterConcurrent.providers.gemini.modelPolicy, "balanced");
+    assert.equal(afterConcurrent.providers.openai.hasKey, true);
+
+    // 2. Verify exact literal prompts and maxOutputTokens for test-connection (512), script 30s & 60s (4096), check-still (2048)
+    await fetch(`${env.baseUrl}/api/test-connection`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: "gemini" }),
+    });
+    const connCall = capturedBodies.at(-1);
+    assert.equal(connCall.body.contents[0].parts[0].text, "Reply with exactly: OK");
+    assert.equal(connCall.body.generationConfig.maxOutputTokens, 512);
+
+    await fetch(`${env.baseUrl}/api/script`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ topic: "pendulum sync", durationSec: 60 }),
+    });
+    const script60Call = capturedBodies.at(-1);
+    const expectedPrompt60 =
+      `Write narration for a vertical (9:16) cartoon story short in the style of "Out of Step": ` +
+      `a true-or-plausible little lesson retold with gentle deadpan humour, one steady English narrator, no captions. ` +
+      `Topic: pendulum sync. Target duration 60 seconds at ~3.5 words/second (~210 words total), about 16 beats. ` +
+      `Structure the beats like: hook, setting, rising action, snap/surprise, deadpan line, plain-language explanation, callback. ` +
+      `Return ONLY JSON, no markdown, in exactly this shape: ` +
+      `{"title":"...","beats":[{"text":"...","estSec":3.5}],"totalWords":123}`;
+    assert.equal(script60Call.body.contents[0].parts[0].text, expectedPrompt60);
+    assert.equal(script60Call.body.generationConfig.maxOutputTokens, 4096);
+
+    await fetch(`${env.baseUrl}/api/check-still`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: Buffer.from("img").toString("base64"),
+        mimeType: "image/jpeg",
+        shotNote: "wide bridge view",
+      }),
+    });
+    const stillCall = capturedBodies.at(-1);
+    const expectedStillPrompt =
+      `You are the visual QA checker for a cartoon short frame. ` +
+      `Shot intent: wide bridge view. ` +
+      `Check: characters readable and not clipped by frame edges or props, no rendering glitches, ` +
+      `no blank/black areas, composition matches the shot intent. ` +
+      `Return ONLY JSON, no markdown: {"verdict":"PASS" or "FAIL","issues":["..."],"summary":"one short sentence"}`;
+    assert.equal(stillCall.body.contents[0].parts[0].text, expectedStillPrompt);
+    assert.equal(stillCall.body.generationConfig.maxOutputTokens, 2048);
+
+    // 3. Parallel POST /api/tts writes serialize atomically without corrupting tts-output.wav or leaving .tmp files
+    const ttsPromises = Array.from({ length: 4 }, (_, i) =>
+      fetch(`${env.baseUrl}/api/tts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: `Parallel line ${i}` }),
+      }).then((r) => r.json()),
+    );
+    const ttsResults = await Promise.all(ttsPromises);
+    for (const r of ttsResults) {
+      assert.equal(r.ok, true);
+      assert.equal(r.file, "app/data/tts-output.wav");
+      assert.equal(r.bytes, 44 + 3600);
+    }
+    const wavDisk = fs.readFileSync(path.join(env.dataDir, "tts-output.wav"));
+    assert.equal(wavDisk.length, 44 + 3600);
+    assert.equal(wavDisk.toString("ascii", 0, 4), "RIFF");
+    const leftoverTmp = fs.readdirSync(env.dataDir).filter((f) => f.endsWith(".tmp"));
+    assert.deepEqual(leftoverTmp, []);
+
+    // 4. clearKey: true explicitly removes the saved key
+    const cleared = await fetch(`${env.baseUrl}/api/settings`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: "gemini", fields: { clearKey: true } }),
+    }).then((r) => r.json());
+    assert.equal(cleared.ok, true);
+    assert.equal(cleared.providers.gemini.hasKey, false);
+    assert.equal(cleared.providers.gemini.apiKey, "");
+  } finally {
+    await env.close();
+  }
+});

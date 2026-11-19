@@ -1,5 +1,21 @@
 # Studio app — verification log
 
+## OOS-03 Verification (2026-11-19, Gemini Reliability Hardening, Backtest & Brand-New 15s Video `OOSDemo15`)
+
+Branch: `feat/studio-react-vite-migration` (upgraded from baseline `3958dc6ed94ee1e3ad71fab14c9f4606c1f8d638`).
+Full artifacts, QA reports & screenshots: `docs/executions/OOS-03-20261119-110542/`.
+
+| Gate / Check | Status | Evidence |
+|---|---|---|
+| `cd app && npm test` (`test/*.test.mjs`) | PASS (`MOCK_PASS`) | `33/33` tests in `~210 ms`: golden contracts, pagination loop detection, misleading `displayName` & sparse metadata guards, `Retry-After` budget compliance, unknown-scope `429` conservative stop, anti-thundering-herd recovery probe, anti-oscillation cooldown multiplier, semaphore queue abort, parallel TTS atomic writes, and `OOSDemo15` storyboard/motion determinism |
+| `cd app && npm run build` | PASS | Vite `v7.3.8` production bundle built to `app/dist/` (`0.77 kB` HTML, `28.00 kB` CSS, `290.66 kB` JS, exit code 0) |
+| `cd app && npm run test:e2e` (`test/e2e-ui.mjs`) | PASS (`MOCK_PASS`) | Headless Chrome E2E across Vite dev server and production `server.mjs`, `36` viewport/tab checks (`320–1920` px), zero horizontal overflow, zero console/page errors, macOS Chrome discovery & isolated artifact output |
+| Live Gemini Provider Probe | `LIVE_BLOCKED` | No `app/data/settings.json` or `GEMINI_API_KEY` configured on this runner (`test-artifacts/live-gemini-probe.json`) |
+| `engine/` TypeScript & `CowboyShort` Targeted Frame Regression | PASS | `cd engine && npx tsc --noEmit` exit code 0; `git diff engine/src/videos/cowboy pipeline` empty (`0` bytes changed); 6 representative `CowboyShort` stills (`f60, f200, f400, f550, f700, f830`) rendered and verified (`test-artifacts/cowboy-regression-stills.json`); full 894-frame render `NOT_RUN` |
+| Brand-New 15s Video (`OOSDemo15`: *"The Roman Messenger Who Lost His Scroll"*) | PASS | `out/oos-03/demo15/final_15s_1080x1920.mp4` (`1080×1920`, `30/1` fps, `450` frames, `15.000s`, H.264 + `48000` Hz stereo AAC, `-16.9` LUFS, `-1.5` dBFS peak, `0` black, `0` white, `0` frozen, `0` pops in `short_qa.py`, SHA-256 `3120d40cfd28d142790287cfec665f39a9f597b845055ff4cc16c54fbb0971ea`) |
+
+---
+
 ## OOS-UI-02 Verification (2026-11-19, React + Vite Redesign & Gemini Auto Discovery/Fallback)
 
 Branch: `feat/studio-react-vite-migration` (upgraded from baseline `ec4de1340bfedefa9b4dd98b9f9d37a9315be9ce`).

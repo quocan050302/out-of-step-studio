@@ -1,0 +1,200 @@
+=== BASELINE RUN AT 2026-11-19T11:08:28Z ===
+HEAD: 3958dc6ed94ee1e3ad71fab14c9f4606c1f8d638
+
+--- [1] cd app && npm ci ---
+
+added 67 packages in 3s
+EXIT: 0 | DURATION_MS: 3073
+
+--- [2] cd app && npm test ---
+
+> out-of-step-studio-ui@1.0.0 test
+> node --test test/*.test.mjs
+
+TAP version 13
+# Subtest: D3 \#01: missing API key makes zero network calls and returns not connected
+ok 1 - D3 \#01: missing API key makes zero network calls and returns not connected
+  ---
+  duration_ms: 1.561583
+  type: 'test'
+  ...
+# Subtest: D3 \#04: Pro 503 retries bounded times then falls back to Flash with real trail
+ok 2 - D3 \#04: Pro 503 retries bounded times then falls back to Flash with real trail
+  ---
+  duration_ms: 42.542583
+  type: 'test'
+  ...
+# Subtest: D3 \#05: Pro 503 -> Flash 503 -> Flash-Lite succeeds and stops immediately
+ok 3 - D3 \#05: Pro 503 -> Flash 503 -> Flash-Lite succeeds and stops immediately
+  ---
+  duration_ms: 2.970292
+  type: 'test'
+  ...
+# Subtest: D3 \#06: HTTP 200 with empty or non-OK body fails verification
+ok 4 - D3 \#06: HTTP 200 with empty or non-OK body fails verification
+  ---
+  duration_ms: 0.69975
+  type: 'test'
+  ...
+# Subtest: D3 \#07 & \#08: 401 invalid key and 403 permission denied make zero fallback attempts
+ok 5 - D3 \#07 & \#08: 401 invalid key and 403 permission denied make zero fallback attempts
+  ---
+  duration_ms: 0.897791
+  type: 'test'
+  ...
+# Subtest: D3 \#09 & \#10: 429 model-level obeys RetryInfo while 429 global quota halts immediately
+ok 6 - D3 \#09 & \#10: 429 model-level obeys RetryInfo while 429 global quota halts immediately
+  ---
+  duration_ms: 2.735834
+  type: 'test'
+  ...
+# Subtest: D3 \#11: 400 generationConfig parameter mismatch adapts once; malformed payload does not fallback
+ok 7 - D3 \#11: 400 generationConfig parameter mismatch adapts once; malformed payload does not fallback
+  ---
+  duration_ms: 1.481166
+  type: 'test'
+  ...
+# Subtest: D3 \#12: 404 from stale catalog triggers bounded one-time rediscovery
+ok 8 - D3 \#12: 404 from stale catalog triggers bounded one-time rediscovery
+  ---
+  duration_ms: 0.700583
+  type: 'test'
+  ...
+# Subtest: D3 \#13 & \#14: non-JSON/timeout errors stay bounded and all-fail never reports green
+ok 9 - D3 \#13 & \#14: non-JSON/timeout errors stay bounded and all-fail never reports green
+  ---
+  duration_ms: 1.054375
+  type: 'test'
+  ...
+# Subtest: D3 \#16, \#17, \#18 & \#24: cooldown reuse across script/still/tts, output validators, and auto-upgrade recovery
+ok 10 - D3 \#16, \#17, \#18 & \#24: cooldown reuse across script/still/tts, output validators, and auto-upgrade recovery
+  ---
+  duration_ms: 1.847125
+  type: 'test'
+  ...
+# Subtest: D3 \#17 & \#18: bad schema or missing TTS inlineData fails validation cleanly
+ok 11 - D3 \#17 & \#18: bad schema or missing TTS inlineData fails validation cleanly
+  ---
+  duration_ms: 0.374708
+  type: 'test'
+  ...
+# Subtest: D3 \#21: AbortController cancels in-flight retry/request without persisting fake verification
+ok 12 - D3 \#21: AbortController cancels in-flight retry/request without persisting fake verification
+  ---
+  duration_ms: 0.531666
+  type: 'test'
+  ...
+# Subtest: D3 \#22 & \#23: blank key preservation, legacy schema migration, secret masking, and manual ceiling
+ok 13 - D3 \#22 & \#23: blank key preservation, legacy schema migration, secret masking, and manual ceiling
+  ---
+  duration_ms: 3.00525
+  type: 'test'
+  ...
+# Subtest: normalizeModelId strips single models/ prefix and rejects unsafe IDs
+ok 14 - normalizeModelId strips single models/ prefix and rejects unsafe IDs
+  ---
+  duration_ms: 0.777208
+  type: 'test'
+  ...
+# Subtest: D3 \#02 & \#15: multi-page discovery + capability classification excludes non-matching models
+ok 15 - D3 \#02 & \#15: multi-page discovery + capability classification excludes non-matching models
+  ---
+  duration_ms: 45.5635
+  type: 'test'
+  ...
+# Subtest: D3 \#03 & \#23: ranking is deterministic regardless of API order and respects policy/preview
+ok 16 - D3 \#03 & \#23: ranking is deterministic regardless of API order and respects policy/preview
+  ---
+  duration_ms: 0.77275
+  type: 'test'
+  ...
+# Subtest: D3 \#19 & \#20: catalog service caches within TTL, coalesces single-flight, and invalidates per key
+ok 17 - D3 \#19 & \#20: catalog service caches within TTL, coalesces single-flight, and invalidates per key
+  ---
+  duration_ms: 66.975333
+  type: 'test'
+  ...
+# Subtest: classifyGeminiModel respects SDK supportedActions alias
+ok 18 - classifyGeminiModel respects SDK supportedActions alias
+  ---
+  duration_ms: 0.16475
+  type: 'test'
+  ...
+# Subtest: HTTP server preserves all legacy contracts, supports NDJSON streaming, and redacts keys
+ok 19 - HTTP server preserves all legacy contracts, supports NDJSON streaming, and redacts keys
+  ---
+  duration_ms: 66.277875
+  type: 'test'
+  ...
+# Subtest: connection pill retains no-key precedence
+ok 20 - connection pill retains no-key precedence
+  ---
+  duration_ms: 0.576083
+  type: 'test'
+  ...
+# Subtest: connection pill carries over last persisted test status and freshness
+ok 21 - connection pill carries over last persisted test status and freshness
+  ---
+  duration_ms: 0.281625
+  type: 'test'
+  ...
+# Subtest: script word count, duration, and clipboard formatting preserve fallbacks
+ok 22 - script word count, duration, and clipboard formatting preserve fallbacks
+  ---
+  duration_ms: 0.519417
+  type: 'test'
+  ...
+# Subtest: validateImageFile enforces MIME type, non-empty size, and 12MB base64 ceiling
+ok 23 - validateImageFile enforces MIME type, non-empty size, and 12MB base64 ceiling
+  ---
+  duration_ms: 0.607625
+  type: 'test'
+  ...
+# Subtest: api() and streamTestConnection() handle non-JSON errors and NDJSON chunks
+ok 24 - api() and streamTestConnection() handle non-JSON errors and NDJSON chunks
+  ---
+  duration_ms: 32.268125
+  type: 'test'
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 167.428208
+EXIT: 0 | DURATION_MS: 359
+
+--- [3] cd app && npm run build ---
+
+> out-of-step-studio-ui@1.0.0 build
+> vite build
+
+vite v7.3.8 building client environment for production...
+transforming...
+✓ 2143 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.77 kB │ gzip:  0.50 kB
+dist/assets/index-CWPXyYZX.css   28.00 kB │ gzip:  6.02 kB
+dist/assets/index-ByAb6vyW.js   290.51 kB │ gzip: 89.29 kB
+✓ built in 1.19s
+EXIT: 0 | DURATION_MS: 1871
+
+--- [4] cd app && npm run test:e2e (unmodified baseline on macOS) ---
+
+> out-of-step-studio-ui@1.0.0 test:e2e
+> node test/e2e-ui.mjs
+
+SKIP e2e-ui: No local Chrome/Edge/Chromium binary found.
+EXIT: 0 | DURATION_MS: 461
+
+--- [5] cd engine && npm ci ---
+
+added 271 packages in 4s
+EXIT: 0 | DURATION_MS: 4576
+
+--- [6] cd engine && npx tsc --noEmit ---
+EXIT: 0 | DURATION_MS: 1135

@@ -82,26 +82,39 @@ export async function streamTestConnection({ provider = "gemini", signal, onProg
   let buffer = "";
   let finalResult = null;
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    let nlIndex;
-    while ((nlIndex = buffer.indexOf("\n")) >= 0) {
-      const line = buffer.slice(0, nlIndex).trim();
-      buffer = buffer.slice(nlIndex + 1);
-      if (!line) continue;
-      let parsed;
-      try {
-        parsed = JSON.parse(line);
-      } catch {
-        continue;
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        await reader.cancel().catch(() => {});
+        throw new DOMException("Operation aborted", "AbortError");
       }
-      if (parsed.type === "progress" && onProgress && parsed.event) {
-        onProgress(parsed.event);
-      } else if (parsed.type === "result") {
-        finalResult = parsed.data;
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nlIndex;
+      while ((nlIndex = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nlIndex).trim();
+        buffer = buffer.slice(nlIndex + 1);
+        if (!line) continue;
+        let parsed;
+        try {
+          parsed = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (parsed.type === "progress" && onProgress && parsed.event) {
+          onProgress(parsed.event);
+        } else if (parsed.type === "result") {
+          finalResult = parsed.data;
+        }
       }
+    }
+    buffer += decoder.decode();
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // ignore releaseLock error
     }
   }
 

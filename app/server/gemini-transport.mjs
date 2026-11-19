@@ -69,27 +69,37 @@ function parseRetryDelayMs(json, retryAfterHeader) {
   return null;
 }
 
-function inspectQuotaScope(json) {
+function inspectQuotaScope(json, fallbackMessage = "") {
   const details = Array.isArray(json?.error?.details) ? json.error.details : [];
-  const msg = String(json?.error?.message || "");
+  const msg = String(json?.error?.message || fallbackMessage || "");
   const parts = [msg];
+  let hasModelDimension = false;
   for (const d of details) {
     if (Array.isArray(d?.violations)) {
       for (const v of d.violations) {
+        if (v?.quotaDimensions?.model) hasModelDimension = true;
         parts.push(String(v?.quotaId || ""), String(v?.quotaMetric || ""), JSON.stringify(v?.quotaDimensions || {}));
       }
     }
   }
   const combined = parts.join(" ");
   if (
-    /\b(per[_ -]?day|daily|GenerateRequestsPerDay|plan and billing|billing account|project[_ -]?quota|global[_ -]?quota|account quota)\b/i.test(
+    /\b(per[_ -]?day|daily|GenerateRequestsPerDay|plan and billing|billing account|billing details|project[_ -]?quota|global[_ -]?quota|account quota)\b/i.test(
       combined,
     ) &&
     !/PerMinutePerProjectPerModel/i.test(combined)
   ) {
     return "global";
   }
-  return "model";
+  if (
+    hasModelDimension ||
+    /\b(PerMinutePerProjectPerModel|PerModel|per[_ -]?model|RPM|TPM|requests per minute|tokens per minute|for model|model rate limit)\b/i.test(
+      combined,
+    )
+  ) {
+    return "model";
+  }
+  return "unknown";
 }
 
 export async function geminiGenerate({
@@ -253,20 +263,38 @@ export function classifyGeminiError(err) {
   }
 
   if (status === 429 || grpc === "RESOURCE_EXHAUSTED") {
+    const scope = err?.quotaScope || inspectQuotaScope({ error: { details: err?.errorDetails, message: msg } }, msg);
     const isGlobal =
-      err?.quotaScope === "global" ||
+      scope === "global" ||
       (Number.isFinite(err?.retryAfterMs) && err.retryAfterMs > 60_000);
     if (isGlobal) {
       return {
         category: "quota_global",
+        quotaScope: "global",
         retryable: false,
         fallbackEligible: false,
         maxRetries: 0,
         summary: "Project or daily Gemini quota exhausted (HTTP 429). Check plan/quota in Google AI Studio.",
       };
     }
+    if (scope === "unknown") {
+      const hasBoundedRetryAfter =
+        Number.isFinite(err?.retryAfterMs) && err.retryAfterMs > 0 && err.retryAfterMs <= 60_000;
+      return {
+        category: hasBoundedRetryAfter ? "rate_limited_model" : "quota_global",
+        quotaScope: "unknown",
+        retryable: hasBoundedRetryAfter,
+        fallbackEligible: false,
+        maxRetries: hasBoundedRetryAfter ? 1 : 0,
+        cooldownMs: Math.max(err?.retryAfterMs || 0, 45_000),
+        summary: hasBoundedRetryAfter
+          ? "Gemini rate limit reached (HTTP 429, scope unknown); honoring Retry-After without model-hopping."
+          : "Gemini quota or rate limit reached (HTTP 429, scope unknown); halting to avoid bypassing project quota.",
+      };
+    }
     return {
       category: "rate_limited_model",
+      quotaScope: "model",
       retryable: true,
       fallbackEligible: true,
       maxRetries: 1,
@@ -397,6 +425,7 @@ export async function retryWithBackoff(
     maxRetries = 2,
     baseDelayMs = 600,
     maxDelayMs = 4_000,
+    maxRetryWaitMs = Math.max(maxDelayMs * 4, 30_000),
     rng = Math.random,
     sleepImpl = defaultSleep,
     clock = () => Date.now(),
@@ -424,13 +453,23 @@ export async function retryWithBackoff(
       const jitter = Math.round(exp * (0.2 + 0.3 * rng()));
       let waitMs = Math.min(maxDelayMs, exp + jitter);
       if (Number.isFinite(err?.retryAfterMs) && err.retryAfterMs > 0) {
-        waitMs = Math.min(Math.max(waitMs, err.retryAfterMs), maxDelayMs * 2);
+        // Never retry earlier than Retry-After; if Retry-After exceeds budget, stop and report.
+        if (err.retryAfterMs > maxRetryWaitMs) {
+          err.classificationInfo = info;
+          err.attemptsUsed = attempt;
+          err.retryAfterExceededBudget = true;
+          throw err;
+        }
+        waitMs = Math.max(waitMs, err.retryAfterMs);
       }
 
       const remaining = deadlineAt - clock();
       if (remaining <= waitMs + 50) {
         err.classificationInfo = info;
         err.attemptsUsed = attempt;
+        if (Number.isFinite(err?.retryAfterMs) && err.retryAfterMs > 0) {
+          err.retryAfterExceededBudget = true;
+        }
         throw err;
       }
 
@@ -442,10 +481,21 @@ export async function retryWithBackoff(
   }
 }
 
+export const DEFAULT_VERIFIED_TTL_MS = 30 * 60 * 1000;
+
 export class ModelHealthRegistry {
-  constructor({ clock = () => Date.now(), initialState = null, onPersist = null } = {}) {
+  constructor({
+    clock = () => Date.now(),
+    initialState = null,
+    onPersist = null,
+    verifiedTtlMs = DEFAULT_VERIFIED_TTL_MS,
+  } = {}) {
     this.clock = clock;
-    this.cooldowns = new Map(); // `${keyFp}:${modelId}` -> { until, reason, statusCode, updatedAt }
+    this.verifiedTtlMs = verifiedTtlMs;
+    this.cooldowns = new Map(); // `${keyFp}:${modelId}` -> { until, reason, statusCode, updatedAt, streak }
+    this.failureStreaks = new Map(); // `${keyFp}:${modelId}` -> { count, lastAt }
+    this.recentlyCooledModels = new Set(); // `${keyFp}:${modelId}`
+    this.recoveryProbes = new Set(); // `${keyFp}:${modelId}`
     this.verified = new Map(); // `${keyFp}:${capability}` -> { effectiveModel, preferredModel, downgraded, reason, verifiedAt, latencyMs }
     this.recentTrails = [];
     this.activeKeyFp = "";
@@ -469,19 +519,54 @@ export class ModelHealthRegistry {
   syncKeyFingerprint(keyFp) {
     if (keyFp && this.activeKeyFp && this.activeKeyFp !== keyFp) {
       this.cooldowns.clear();
+      this.failureStreaks.clear();
+      this.recentlyCooledModels.clear();
+      this.recoveryProbes.clear();
+      this.verified.clear();
+      this.recentTrails = [];
+    } else if (!keyFp && this.activeKeyFp) {
+      this.cooldowns.clear();
+      this.failureStreaks.clear();
+      this.recentlyCooledModels.clear();
+      this.recoveryProbes.clear();
       this.verified.clear();
       this.recentTrails = [];
     }
     this.activeKeyFp = keyFp || "";
   }
 
+  invalidateVerified(keyFp = null) {
+    if (!keyFp) {
+      this.verified.clear();
+    } else {
+      for (const k of Array.from(this.verified.keys())) {
+        if (k.startsWith(`${keyFp}:`)) this.verified.delete(k);
+      }
+    }
+    this._persist();
+  }
+
   markCooldown(keyFp, modelId, { durationMs = 60_000, reason = "overload", statusCode = 503 } = {}) {
     if (!keyFp || !modelId || durationMs <= 0) return;
     const now = this.clock();
-    this.cooldowns.set(`${keyFp}:${modelId}`, {
-      until: now + durationMs,
+    const key = `${keyFp}:${modelId}`;
+    const prevStreak = this.failureStreaks.get(key);
+    const streak =
+      prevStreak && now - prevStreak.lastAt < 10 * 60 * 1000 ? prevStreak.count + 1 : 1;
+    this.failureStreaks.set(key, { count: streak, lastAt: now });
+
+    // Anti-oscillation backoff when a model repeatedly fails after recovery
+    const multiplier = reason === "unsupported" ? 1 : Math.min(4, 1.5 ** (streak - 1));
+    const effectiveDurationMs = Math.min(600_000, Math.round(durationMs * multiplier));
+
+    this.recentlyCooledModels.add(key);
+    this.recoveryProbes.delete(key);
+    this.cooldowns.set(key, {
+      until: now + effectiveDurationMs,
+      durationMs: effectiveDurationMs,
       reason,
       statusCode,
+      streak,
       updatedAt: now,
     });
   }
@@ -498,6 +583,30 @@ export class ModelHealthRegistry {
     return entry;
   }
 
+  needsRecoveryProbe(keyFp, modelId) {
+    if (!keyFp || !modelId) return false;
+    const key = `${keyFp}:${modelId}`;
+    return this.recentlyCooledModels.has(key) && !this.getCooldown(keyFp, modelId);
+  }
+
+  isRecoveryProbeInFlight(keyFp, modelId) {
+    if (!keyFp || !modelId) return false;
+    return this.recoveryProbes.has(`${keyFp}:${modelId}`);
+  }
+
+  tryAcquireRecoveryProbe(keyFp, modelId) {
+    if (!keyFp || !modelId) return false;
+    const key = `${keyFp}:${modelId}`;
+    if (this.recoveryProbes.has(key)) return false;
+    this.recoveryProbes.add(key);
+    return true;
+  }
+
+  releaseRecoveryProbe(keyFp, modelId) {
+    if (!keyFp || !modelId) return;
+    this.recoveryProbes.delete(`${keyFp}:${modelId}`);
+  }
+
   recordVerifiedSuccess(
     keyFp,
     capability,
@@ -505,7 +614,11 @@ export class ModelHealthRegistry {
   ) {
     if (!keyFp || !capability || !effectiveModel) return;
     this.syncKeyFingerprint(keyFp);
-    this.cooldowns.delete(`${keyFp}:${effectiveModel}`);
+    const modelKey = `${keyFp}:${effectiveModel}`;
+    this.cooldowns.delete(modelKey);
+    this.failureStreaks.delete(modelKey);
+    this.recentlyCooledModels.delete(modelKey);
+    this.recoveryProbes.delete(modelKey);
     this.verified.set(`${keyFp}:${capability}`, {
       effectiveModel,
       preferredModel: preferredModel || effectiveModel,
@@ -519,7 +632,14 @@ export class ModelHealthRegistry {
 
   getVerified(keyFp, capability) {
     if (!keyFp || !capability) return null;
-    return this.verified.get(`${keyFp}:${capability}`) || null;
+    const key = `${keyFp}:${capability}`;
+    const entry = this.verified.get(key);
+    if (!entry) return null;
+    if (Number.isFinite(entry.verifiedAt) && this.clock() - entry.verifiedAt >= this.verifiedTtlMs) {
+      this.verified.delete(key);
+      return null;
+    }
+    return entry;
   }
 
   recordTrail(trail) {
@@ -553,15 +673,16 @@ export class ModelHealthRegistry {
       const manualField =
         cap === "text" ? "textModel" : cap === "vision" ? "visionModel" : "ttsModel";
       const isManual = settings?.gemini?.selectionMode === "manual";
+      const selectedModel = settings?.gemini?.[manualField] || ranked[0]?.id || null;
       const preferred = isManual
-        ? settings?.gemini?.[manualField] || ranked[0]?.id || null
-        : ranked[0]?.id || settings?.gemini?.[manualField] || null;
+        ? selectedModel
+        : ranked[0]?.id || selectedModel || null;
       const ver = keyFp ? this.getVerified(keyFp, cap) : null;
       const prefCooldown = keyFp && preferred ? this.getCooldown(keyFp, preferred) : null;
 
       let activeModel = preferred;
       let statusReason = null;
-      if (!isManual && prefCooldown && ver?.effectiveModel && !this.getCooldown(keyFp, ver.effectiveModel)) {
+      if (prefCooldown && ver?.effectiveModel && !this.getCooldown(keyFp, ver.effectiveModel)) {
         activeModel = ver.effectiveModel;
         statusReason = `Preferred model ${preferred} cooling down (${prefCooldown.reason})`;
       } else if (ver?.effectiveModel && isManual && ver.effectiveModel === preferred) {
@@ -574,7 +695,9 @@ export class ModelHealthRegistry {
       out[cap] = {
         capability: cap,
         selectionMode: isManual ? "manual" : "auto",
+        selectedModel,
         preferredModel: preferred,
+        effectiveModel: activeModel,
         activeModel,
         verifiedModel: ver?.effectiveModel || null,
         verifiedAt: ver?.verifiedAt || null,
@@ -599,7 +722,7 @@ export class ModelHealthRegistry {
 export function chooseCandidateList({
   capability,
   settings,
-  catalogModels,
+  catalogModels = [],
   healthRegistry,
   keyFp,
   maxCandidates = 3,
@@ -612,10 +735,76 @@ export function chooseCandidateList({
   const configuredModel = settings?.gemini?.[manualField] || "";
 
   const ranked = rankGeminiModels(catalogModels, { capability, policy, includePreview });
+  const verified = healthRegistry?.getVerified(keyFp, capability);
+
+  function partitionByHealth(items, preferredId) {
+    const healthy = [];
+    const deferredProbing = [];
+    const coolingTransient = [];
+    const coolingUnsupported = [];
+
+    for (const m of items) {
+      const cd = healthRegistry?.getCooldown(keyFp, m.id);
+      if (cd) {
+        if (cd.reason === "unsupported") {
+          coolingUnsupported.push(m);
+        } else {
+          coolingTransient.push(m);
+        }
+      } else if (
+        healthRegistry?.needsRecoveryProbe?.(keyFp, m.id) &&
+        healthRegistry?.isRecoveryProbeInFlight?.(keyFp, m.id)
+      ) {
+        deferredProbing.push(m);
+      } else {
+        healthy.push(m);
+      }
+    }
+
+    const prefCooldown = preferredId ? healthRegistry?.getCooldown(keyFp, preferredId) : null;
+    const prefDeferred =
+      preferredId &&
+      healthRegistry?.needsRecoveryProbe?.(keyFp, preferredId) &&
+      healthRegistry?.isRecoveryProbeInFlight?.(keyFp, preferredId);
+
+    // If preferred is cooling down or already being probed by a concurrent caller, promote verified healthy model to front
+    if ((prefCooldown || prefDeferred) && verified?.effectiveModel) {
+      const idx = healthy.findIndex((m) => m.id === verified.effectiveModel);
+      if (idx > 0) {
+        const [hit] = healthy.splice(idx, 1);
+        healthy.unshift(hit);
+      }
+    }
+
+    // Never place a cooling model ahead of a healthy model; skip known 404 unsupported while catalog is unchanged
+    const ordered = [...healthy, ...deferredProbing, ...coolingTransient];
+    const finalPool = ordered.length > 0 ? ordered : coolingUnsupported;
+    const cooldownPromoted = Boolean(
+      preferredId && finalPool.length > 0 && finalPool[0].id !== preferredId && (prefCooldown || prefDeferred),
+    );
+    const cooldownReason = prefCooldown
+      ? prefCooldown.reason
+      : prefDeferred
+        ? "recovery_probe_in_flight"
+        : null;
+
+    return {
+      ordered: finalPool,
+      cooldownPromoted,
+      cooldownReason,
+    };
+  }
 
   if (mode === "manual" && configuredModel) {
+    const catalogHit = catalogModels.find((m) => m.id === configuredModel);
+    const incompatibleManual =
+      (catalogHit?.capabilities && catalogHit.capabilities[capability] === false) ||
+      (capability === "tts" && !catalogHit && !/-tts(?:-|$)/i.test(configuredModel)) ||
+      (capability !== "tts" && /-tts(?:-|$)/i.test(configuredModel)) ||
+      (capability === "vision" && (/^gemini-1\.0-pro(?:-|$)/i.test(configuredModel) || configuredModel === "gemini-pro"));
+
     const manualMeta =
-      catalogModels.find((m) => m.id === configuredModel) || {
+      catalogHit || {
         id: configuredModel,
         tier: /-pro(?:-|$)/i.test(configuredModel)
           ? "pro"
@@ -631,15 +820,21 @@ export function chooseCandidateList({
         !m.isRollingAlias &&
         (QUALITY_TIER_ORDER[m.tier] ?? 0) <= manualCeiling,
     );
-    const combined = [
-      { id: configuredModel, rank: 1, tier: manualMeta.tier, manual: true },
-      ...fallbacks.map((m, idx) => ({ ...m, rank: idx + 2 })),
-    ];
+    const combined = incompatibleManual
+      ? fallbacks.map((m, idx) => ({ ...m, rank: idx + 1 }))
+      : [
+          { id: configuredModel, rank: 1, tier: manualMeta.tier, manual: true },
+          ...fallbacks.map((m, idx) => ({ ...m, rank: idx + 2 })),
+        ];
+    const preferredModel = combined[0]?.id || configuredModel;
+    const { ordered, cooldownPromoted, cooldownReason } = partitionByHealth(combined, preferredModel);
     return {
-      preferredModel: configuredModel,
+      selectedModel: configuredModel,
+      preferredModel,
       rankedAll: ranked,
-      candidates: combined.slice(0, maxCandidates),
-      cooldownPromoted: false,
+      candidates: ordered.slice(0, maxCandidates),
+      cooldownPromoted,
+      cooldownReason,
     };
   }
 
@@ -657,10 +852,12 @@ export function chooseCandidateList({
 
   if (deduped.length === 0) {
     return {
+      selectedModel: configuredModel || null,
       preferredModel: configuredModel || null,
       rankedAll: ranked,
       candidates: [],
       cooldownPromoted: false,
+      cooldownReason: null,
     };
   }
 
@@ -680,38 +877,15 @@ export function chooseCandidateList({
   const tierDiversified = [...firstPerTier, ...remainder];
 
   const preferredModel = tierDiversified[0].id;
-  const prefCooldown = healthRegistry?.getCooldown(keyFp, preferredModel);
-  const verified = healthRegistry?.getVerified(keyFp, capability);
-
-  let ordered = tierDiversified.slice();
-  let cooldownPromoted = false;
-
-  if (prefCooldown) {
-    const healthy = [];
-    const cooling = [];
-    for (const m of ordered) {
-      if (healthRegistry.getCooldown(keyFp, m.id)) cooling.push(m);
-      else healthy.push(m);
-    }
-    // If we have a verified working model in healthy, promote it to front while preferred cools down
-    if (verified?.effectiveModel) {
-      const idx = healthy.findIndex((m) => m.id === verified.effectiveModel);
-      if (idx > 0) {
-        const [hit] = healthy.splice(idx, 1);
-        healthy.unshift(hit);
-      }
-    }
-    if (healthy.length > 0) {
-      ordered = [...healthy, ...cooling];
-      cooldownPromoted = ordered[0].id !== preferredModel;
-    }
-  }
+  const { ordered, cooldownPromoted, cooldownReason } = partitionByHealth(tierDiversified, preferredModel);
 
   return {
+    selectedModel: configuredModel || preferredModel,
     preferredModel,
     rankedAll: ranked,
     candidates: ordered.slice(0, maxCandidates),
     cooldownPromoted,
+    cooldownReason,
   };
 }
 
@@ -789,19 +963,45 @@ export function validateScriptResponse(json) {
   }
   const beats = parsed.beats.map((b, idx) => {
     const text = typeof b?.text === "string" ? b.text.trim() : "";
-    const estSec = Number(b?.estSec ?? 0);
-    if (!text || !Number.isFinite(estSec) || estSec < 0) {
-      const err = new Error(`Script beat #${idx + 1} is malformed.`);
+    const estSec = Number(b?.estSec);
+    if (!text || !Number.isFinite(estSec) || estSec <= 0) {
+      const err = new Error(`Script beat #${idx + 1} is malformed (requires non-empty text and finite positive estSec).`);
       err.code = "INVALID_OUTPUT";
       throw err;
     }
     return { text, estSec };
   });
+
+  const totalEstSec = beats.reduce((sum, b) => sum + b.estSec, 0);
+  if (!Number.isFinite(totalEstSec) || totalEstSec <= 0 || totalEstSec > 600) {
+    const err = new Error(`Script total estimated duration (${totalEstSec}s) is outside valid bounds.`);
+    err.code = "INVALID_OUTPUT";
+    throw err;
+  }
+
+  const computedWords = beats.reduce(
+    (sum, b) => sum + b.text.split(/\s+/).filter(Boolean).length,
+    0,
+  );
+  if (parsed.totalWords !== undefined && parsed.totalWords !== null) {
+    const reportedWords = Number(parsed.totalWords);
+    if (!Number.isFinite(reportedWords) || reportedWords <= 0) {
+      const err = new Error("Script totalWords must be a finite positive number.");
+      err.code = "INVALID_OUTPUT";
+      throw err;
+    }
+  }
+
+  const totalWords =
+    parsed.totalWords !== undefined && parsed.totalWords !== null
+      ? Number(parsed.totalWords)
+      : computedWords;
+
   return {
     script: {
       title: typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : "Untitled",
       beats,
-      ...(Number.isFinite(Number(parsed.totalWords)) ? { totalWords: Number(parsed.totalWords) } : {}),
+      totalWords,
     },
   };
 }
@@ -834,15 +1034,40 @@ export function validateStillVerdict(json) {
   };
 }
 
+const MAX_TTS_PCM_BYTES = 24000 * 2 * 300; // 5 minutes at 24 kHz mono PCM16
+const MIN_TTS_PCM_BYTES = 48; // >= 1 ms at 24 kHz mono PCM16
+
 export function validateTtsAudio(json) {
   const parts = json?.candidates?.[0]?.content?.parts || [];
-  const audioPart = parts.find((x) => typeof x?.inlineData?.data === "string" && x.inlineData.data.length > 0);
+  const audioPart = parts.find((x) => typeof x?.inlineData?.data === "string" && x.inlineData.data.trim().length > 0);
   if (!audioPart) {
     const err = new Error("Model returned no audio data (TTS may be unavailable for this model/account).");
     err.code = "INVALID_OUTPUT";
     throw err;
   }
-  const pcm = Buffer.from(audioPart.inlineData.data, "base64");
+  const cleanB64 = audioPart.inlineData.data.replace(/\s+/g, "");
+  if (!cleanB64 || cleanB64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(cleanB64)) {
+    const err = new Error("Model returned malformed base64 audio data.");
+    err.code = "INVALID_OUTPUT";
+    throw err;
+  }
+  const pcm = Buffer.from(cleanB64, "base64");
+  if (pcm.length < MIN_TTS_PCM_BYTES || pcm.length % 2 !== 0) {
+    const err = new Error(`Invalid PCM16 audio buffer length (${pcm.length} bytes).`);
+    err.code = "INVALID_OUTPUT";
+    throw err;
+  }
+  if (pcm.length > MAX_TTS_PCM_BYTES) {
+    const err = new Error(`TTS audio buffer exceeds maximum bounded duration (${pcm.length} bytes).`);
+    err.code = "INVALID_OUTPUT";
+    throw err;
+  }
+  const hasNonZeroSample = pcm.some((byte) => byte !== 0);
+  if (!hasNonZeroSample) {
+    const err = new Error("Model returned silent all-zero PCM audio buffer.");
+    err.code = "INVALID_OUTPUT";
+    throw err;
+  }
   const wav = wavWrapPcm16(pcm, 24000, 1);
   return { pcm, wav };
 }
@@ -901,12 +1126,13 @@ export function createGeminiExecutionEngine({
       };
     }
 
-    const releaseSlot = await acquireSlot(signal);
     const attemptedModels = [];
     let totalRequests = 0;
     let rediscoveredOnce = false;
+    let releaseSlot = () => {};
 
     try {
+      releaseSlot = await acquireSlot(signal);
       emit("discovering", { message: "Discovering accessible Gemini models for this API key…" });
 
       let catalogRes;
@@ -971,7 +1197,9 @@ export function createGeminiExecutionEngine({
 
       let candidateQueue = selection.candidates.slice();
       const triedIds = new Set();
-      let fallbackTriggerReason = selection.cooldownPromoted ? "preferred_model_in_cooldown" : null;
+      let fallbackTriggerReason = selection.cooldownPromoted
+        ? selection.cooldownReason || "preferred_model_in_cooldown"
+        : null;
       let lastError = null;
       let lastClassification = null;
 
@@ -986,6 +1214,16 @@ export function createGeminiExecutionEngine({
         const candidate = candidateQueue.shift();
         if (!candidate || triedIds.has(candidate.id)) continue;
         triedIds.add(candidate.id);
+
+        let acquiredProbe = false;
+        if (healthRegistry?.needsRecoveryProbe?.(keyFp, candidate.id)) {
+          acquiredProbe = healthRegistry.tryAcquireRecoveryProbe(keyFp, candidate.id);
+          if (!acquiredProbe && candidateQueue.length > 0) {
+            // Another concurrent request is already probing this recovering candidate -> use next healthy candidate
+            fallbackTriggerReason = fallbackTriggerReason || "recovery_probe_in_flight";
+            continue;
+          }
+        }
 
         let configAdapted = false;
 
@@ -1035,11 +1273,12 @@ export function createGeminiExecutionEngine({
                   startedAt: attemptStarted,
                   elapsedMs,
                   statusCode: response.status,
-                  classification: "ok",
+                  classification: configAdapted ? "ok_adapted" : "ok",
                   outcome: "success",
+                  ...(configAdapted ? { configAdapted: true } : {}),
                 });
 
-                return { response, validated };
+                return { response, validated, configAdapted };
               } catch (attemptErr) {
                 lastCandidateAttemptErr = attemptErr;
                 const elapsedMs = Math.max(0, clock() - attemptStarted);
@@ -1065,29 +1304,57 @@ export function createGeminiExecutionEngine({
                   if (adaptedPayload.adaptedApplied) {
                     totalRequests += 1;
                     const retryStart = clock();
-                    const response2 = await geminiGenerate({
-                      apiKey,
+                    emit("config_adaptation", {
                       model: candidate.id,
-                      parts: adaptedPayload.parts,
-                      generationConfig: adaptedPayload.generationConfig,
-                      baseUrl,
-                      timeoutMs: Math.min(attemptTimeoutMs, Math.max(1_000, deadlineAt - clock())),
-                      signal,
-                      fetchImpl,
-                      clock,
-                    });
-                    const validated2 = validate(response2.data, candidate.id);
-                    attemptedModels.push({
-                      model: candidate.id,
-                      rank: candidate.rank,
                       attempt: attemptNum + 1,
-                      startedAt: retryStart,
-                      elapsedMs: Math.max(0, clock() - retryStart),
-                      statusCode: response2.status,
-                      classification: "ok_adapted",
-                      outcome: "success",
+                      message: `${candidate.id} rejected optional generationConfig field; adapting config once…`,
                     });
-                    return { response: response2, validated: validated2 };
+                    try {
+                      const response2 = await geminiGenerate({
+                        apiKey,
+                        model: candidate.id,
+                        parts: adaptedPayload.parts,
+                        generationConfig: adaptedPayload.generationConfig,
+                        baseUrl,
+                        timeoutMs: Math.min(attemptTimeoutMs, Math.max(1_000, deadlineAt - clock())),
+                        signal,
+                        fetchImpl,
+                        clock,
+                      });
+                      const validated2 = validate(response2.data, candidate.id);
+                      attemptedModels.push({
+                        model: candidate.id,
+                        rank: candidate.rank,
+                        attempt: attemptNum + 1,
+                        startedAt: retryStart,
+                        elapsedMs: Math.max(0, clock() - retryStart),
+                        statusCode: response2.status,
+                        classification: "ok_adapted",
+                        outcome: "success",
+                        configAdapted: true,
+                      });
+                      return { response: response2, validated: validated2, configAdapted: true };
+                    } catch (adaptErr) {
+                      lastCandidateAttemptErr = adaptErr;
+                      const adaptInfo = classifyGeminiError(adaptErr);
+                      attemptedModels.push({
+                        model: candidate.id,
+                        rank: candidate.rank,
+                        attempt: attemptNum + 1,
+                        startedAt: retryStart,
+                        elapsedMs: Math.max(0, clock() - retryStart),
+                        ...(adaptErr?.status ? { statusCode: adaptErr.status } : {}),
+                        ...(adaptErr?.grpcStatus ? { errorCode: adaptErr.grpcStatus } : {}),
+                        classification: adaptInfo.category,
+                        outcome: "failed",
+                        configAdapted: true,
+                        message: redactSecrets(
+                          String(adaptErr?.message || adaptInfo.summary).slice(0, 180),
+                          [apiKey],
+                        ),
+                      });
+                      throw adaptErr;
+                    }
                   }
                 }
 
@@ -1119,9 +1386,18 @@ export function createGeminiExecutionEngine({
           const preferredModel = selection.preferredModel || candidate.id;
           const downgraded = candidate.id !== preferredModel;
           const reason = downgraded ? fallbackTriggerReason || "model_overloaded" : null;
-          const warning = downgraded
-            ? `Preferred model ${preferredModel} was unavailable (${reason.replace(/_/g, " ")}); fulfilled by ${candidate.id}.`
-            : null;
+          const warningParts = [];
+          if (downgraded) {
+            warningParts.push(
+              `Preferred model ${preferredModel} was unavailable (${reason.replace(/_/g, " ")}); fulfilled by ${candidate.id}.`,
+            );
+          }
+          if (candidateOutcome.configAdapted) {
+            warningParts.push(
+              `Optional generationConfig parameter was adapted once after HTTP 400 validation feedback on ${candidate.id}.`,
+            );
+          }
+          const warning = warningParts.length > 0 ? warningParts.join(" ") : null;
 
           healthRegistry.recordVerifiedSuccess(keyFp, capability, {
             effectiveModel: candidate.id,
@@ -1141,6 +1417,7 @@ export function createGeminiExecutionEngine({
             effectiveModel: candidate.id,
             downgraded,
             reason,
+            ...(candidateOutcome.configAdapted ? { configAdapted: true } : {}),
             latencyMs: totalLatencyMs,
             attemptedModels,
           });
@@ -1149,6 +1426,7 @@ export function createGeminiExecutionEngine({
             effectiveModel: candidate.id,
             preferredModel,
             downgraded,
+            ...(candidateOutcome.configAdapted ? { configAdapted: true } : {}),
             latencyMs: totalLatencyMs,
             message: downgraded
               ? `Connected via fallback model ${candidate.id} (preferred ${preferredModel} overloaded).`
@@ -1162,11 +1440,12 @@ export function createGeminiExecutionEngine({
             latencyMs: totalLatencyMs,
             model: candidate.id,
             actualModel: candidate.id,
-            selectedModel: candidate.id,
+            selectedModel: selection.selectedModel || candidate.id,
             effectiveModel: candidate.id,
             preferredModel,
             downgraded,
             reason,
+            ...(candidateOutcome.configAdapted ? { configAdapted: true } : {}),
             ...(warning ? { warning } : {}),
             attemptedModels,
             ...candidateOutcome.validated,
@@ -1227,6 +1506,10 @@ export function createGeminiExecutionEngine({
               reason: info.category,
               message: `${candidate.id} unavailable (${info.category}); trying next eligible model ${nextModel.id}…`,
             });
+          }
+        } finally {
+          if (acquiredProbe) {
+            healthRegistry?.releaseRecoveryProbe?.(keyFp, candidate.id);
           }
         }
       }

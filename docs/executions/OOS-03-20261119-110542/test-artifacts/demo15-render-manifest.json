@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-11-19T11:34:49.488Z",
+  "totalElapsedMs": 122158,
+  "browserExecutable": "Google Chrome",
+  "diskPreflightMb": 15610,
+  "finalMp4": {
+    "path": "out/oos-03/demo15/final_15s_1080x1920.mp4",
+    "sha256": "3120d40cfd28d142790287cfec665f39a9f597b845055ff4cc16c54fbb0971ea",
+    "bytes": 22947400,
+    "width": 1080,
+    "height": 1920,
+    "rFrameRate": "30/1",
+    "nbFrames": 450,
+    "durationSec": 15,
+    "videoCodec": "h264",
+    "audioCodec": "aac",
+    "audioSampleRate": 48000,
+    "audioChannels": 2
+  },
+  "previewMp4": {
+    "path": "out/oos-03/demo15/preview_15s_540x960.mp4",
+    "sha256": "20b4d5920f6735e9281b9e49d509e0b53afde261ffedb3815f1d3a2049fd1d38",
+    "bytes": 8449986
+  },
+  "audioWav": {
+    "path": "out/oos-03/demo15/demo15-mix.wav",
+    "sha256": "6e6878ab1ff4066dbfbd30db36c61a725179cfa7c8f63d0e294c1a216da8dc0e",
+    "bytes": 2880044
+  },
+  "stills": [
+    "frame_0000.png",
+    "frame_0014.png",
+    "frame_0035.png",
+    "frame_0060.png",
+    "frame_0105.png",
+    "frame_0150.png",
+    "frame_0180.png",
+    "frame_0215.png",
+    "frame_0255.png",
+    "frame_0270.png",
+    "frame_0300.png",
+    "frame_0350.png",
+    "frame_0390.png",
+    "frame_0415.png",
+    "frame_0440.png"
+  ],
+  "qaFiles": [
+    "ffprobe_final.json",
+    "ffprobe_preview.json",
+    "perframe.npz",
+    "report.md",
+    "sheet_0000.jpg",
+    "sheet_0060.jpg",
+    "sheet_0120.jpg",
+    "sheet_0180.jpg",
+    "sheet_0240.jpg",
+    "sheet_0300.jpg",
+    "sheet_0360.jpg",
+    "sheet_0420.jpg"
+  ]
+}

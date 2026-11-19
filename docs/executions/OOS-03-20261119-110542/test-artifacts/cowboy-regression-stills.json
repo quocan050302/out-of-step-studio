@@ -1,0 +1,50 @@
+[
+  {
+    "file": "out/oos-03/cowboy-regression/f_200.jpg",
+    "width": 540,
+    "height": 960,
+    "lumaMean": 0.5948,
+    "lumaStd": 0.2167,
+    "sha256": "5c0a34ab68c500dea461524d092e964ed62ecc07b4456e63b27206ec55c23027"
+  },
+  {
+    "file": "out/oos-03/cowboy-regression/f_400.jpg",
+    "width": 540,
+    "height": 960,
+    "lumaMean": 0.4677,
+    "lumaStd": 0.2602,
+    "sha256": "c2f439e94dbd6cda4a4aaf70b4477d763f59f122329dd65dd895024763b74a28"
+  },
+  {
+    "file": "out/oos-03/cowboy-regression/f_550.jpg",
+    "width": 540,
+    "height": 960,
+    "lumaMean": 0.5142,
+    "lumaStd": 0.256,
+    "sha256": "24e0687409f901c51658ee69783f8d67ab2ab6d08208c42c87b6b786de4cdc6e"
+  },
+  {
+    "file": "out/oos-03/cowboy-regression/f_60.jpg",
+    "width": 540,
+    "height": 960,
+    "lumaMean": 0.4236,
+    "lumaStd": 0.1835,
+    "sha256": "47a7a7836ae2d478c09f945d0b910f09b21629c8d8776564e54ec6dfcffbdf54"
+  },
+  {
+    "file": "out/oos-03/cowboy-regression/f_700.jpg",
+    "width": 540,
+    "height": 960,
+    "lumaMean": 0.3854,
+    "lumaStd": 0.1589,
+    "sha256": "fc87fe2ae1f684b0c366019e2f65a350f0e709c18ae635c9d99d5a18b68bfbc5"
+  },
+  {
+    "file": "out/oos-03/cowboy-regression/f_830.jpg",
+    "width": 540,
+    "height": 960,
+    "lumaMean": 0.5222,
+    "lumaStd": 0.2244,
+    "sha256": "1e514ff4fe76f2ebf0f497f92efafa67a3ff073cf3502fc9376d1f0fc91ed40c"
+  }
+]

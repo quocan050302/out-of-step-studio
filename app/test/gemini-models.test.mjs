@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   classifyGeminiModel,
   createModelCatalogService,
+  fetchGeminiModelCatalog,
   normalizeModelId,
   rankGeminiModels,
 } from "../server/gemini-models.mjs";
@@ -281,4 +282,116 @@ test("classifyGeminiModel respects SDK supportedActions alias", () => {
   });
   assert.equal(m.capabilities.text, true);
   assert.equal(m.capabilities.vision, true);
+  assert.equal(m.candidateOnly, true);
+  assert.equal(m.verificationState, "unverified_candidate");
+});
+
+test("OOS-03 catalog matrix: no key, duplicate IDs, pagination loop detection, misleading displayName, unknown metadata, and concurrent forceRefresh/abort", async () => {
+  // 1. No API key throws NO_API_KEY without network calls
+  let hit = 0;
+  await assert.rejects(
+    () =>
+      fetchGeminiModelCatalog("   ", {
+        fetchImpl: async () => {
+          hit += 1;
+          return new Response("{}", { status: 200 });
+        },
+      }),
+    (err) => err.code === "NO_API_KEY",
+  );
+  assert.equal(hit, 0);
+
+  // 2. Duplicate IDs across pages + pagination loop detection (tok_loop repeats)
+  const loopPages = {
+    "": {
+      models: [
+        SAMPLE_RAW_MODELS[5],
+        SAMPLE_RAW_MODELS[6],
+      ],
+      nextPageToken: "tok_loop",
+    },
+    tok_loop: {
+      models: [
+        SAMPLE_RAW_MODELS[5], // duplicate ID
+        SAMPLE_RAW_MODELS[7],
+      ],
+      nextPageToken: "tok_loop", // cycle!
+    },
+  };
+  let loopCalls = 0;
+  const loopRes = await fetchGeminiModelCatalog("AIzaLoopDetectionTestKey1234567", {
+    fetchImpl: async (url) => {
+      loopCalls += 1;
+      const tok = new URL(url).searchParams.get("pageToken") || "";
+      return new Response(JSON.stringify(loopPages[tok]), { status: 200 });
+    },
+  });
+  assert.equal(loopCalls, 2);
+  assert.equal(loopRes.loopDetected, true);
+  assert.equal(loopRes.totalDiscovered, 3); // deduplicated
+
+  // 3. Misleading displayName: non-TTS text model mentioning "TTS" in displayName must NOT be classified as TTS
+  const misleadingTts = classifyGeminiModel({
+    name: "models/gemini-3.8-flash",
+    displayName: "Gemini 3.8 Flash (TTS Narrator Helper)",
+    supportedGenerationMethods: ["generateContent"],
+    inputTokenLimit: 1048576,
+  });
+  assert.equal(misleadingTts.isTts, false);
+  assert.equal(misleadingTts.capabilities.tts, false);
+  assert.equal(misleadingTts.capabilities.text, true);
+  assert.equal(misleadingTts.capabilityConfidence, "low");
+
+  // 4. Unknown/sparse metadata: missing inputTokenLimit and missing supportedInputModalities -> conservative vision=false, confidence=low
+  const sparseModel = classifyGeminiModel({
+    name: "models/gemini-2.5-flash",
+    displayName: "Gemini 2.5 Flash",
+    supportedGenerationMethods: ["generateContent"],
+  });
+  assert.equal(sparseModel.capabilities.text, true);
+  assert.equal(sparseModel.capabilities.vision, false);
+  assert.equal(sparseModel.capabilityConfidence, "low");
+  assert.equal(sparseModel.candidateOnly, true);
+
+  // Explicit IMAGE input modality enables vision even if inputTokenLimit is omitted
+  const explicitVision = classifyGeminiModel({
+    name: "models/gemini-2.5-flash",
+    displayName: "Gemini 2.5 Flash",
+    supportedGenerationMethods: ["generateContent"],
+    supportedInputModalities: ["TEXT", "IMAGE"],
+    supportedOutputModalities: ["TEXT"],
+  });
+  assert.equal(explicitVision.capabilities.vision, true);
+  assert.equal(explicitVision.capabilityConfidence, "high");
+
+  // 5. rankGeminiModels attaches rankSource and rankRationale
+  const rankedWithMeta = rankGeminiModels(SAMPLE_RAW_MODELS, {
+    capability: "text",
+    policy: "quality",
+  });
+  assert.equal(rankedWithMeta[0].rankSource, "tier_heuristic_candidate");
+  assert.match(rankedWithMeta[0].rankRationale, /catalog candidate only/);
+
+  // 6. Concurrent forceRefresh coalescing + single caller abort isolation
+  let refreshHits = 0;
+  const svc = createModelCatalogService({
+    fetchImpl: async () => {
+      refreshHits += 1;
+      await new Promise((r) => setTimeout(r, 30));
+      return new Response(JSON.stringify({ models: SAMPLE_RAW_MODELS.slice(5, 8) }), { status: 200 });
+    },
+  });
+  const abortCtrl = new AbortController();
+  setTimeout(() => abortCtrl.abort(), 5);
+
+  const [abortedOutcome, validOutcome1, validOutcome2] = await Promise.allSettled([
+    svc.listGeminiModels("key-coalesce-999", { forceRefresh: true, signal: abortCtrl.signal }),
+    svc.listGeminiModels("key-coalesce-999", { forceRefresh: true }),
+    svc.listGeminiModels("key-coalesce-999", { forceRefresh: true }),
+  ]);
+  assert.equal(abortedOutcome.status, "rejected");
+  assert.equal(abortedOutcome.reason?.name, "AbortError");
+  assert.equal(validOutcome1.status, "fulfilled");
+  assert.equal(validOutcome2.status, "fulfilled");
+  assert.equal(refreshHits, 1);
 });

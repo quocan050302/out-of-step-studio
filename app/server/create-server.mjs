@@ -19,6 +19,7 @@ import {
   validateTtsAudio,
 } from "./gemini-transport.mjs";
 import {
+  atomicWriteBufferSync,
   keyFingerprint,
   loadRuntimeState,
   loadSettings,
@@ -26,6 +27,7 @@ import {
   redactSecrets,
   saveRuntimeState,
   updateProviderSettings,
+  withDataDirLock,
 } from "./settings-store.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -119,6 +121,12 @@ function sanitizeCatalogForClient(models) {
     outputTokenLimit: m.outputTokenLimit,
     capabilities: m.capabilities,
     exclusionReason: m.exclusionReason,
+    candidateOnly: m.candidateOnly !== false,
+    verificationState: m.verificationState || "unverified_candidate",
+    capabilityConfidence: m.capabilityConfidence || "medium",
+    ...(m.rank ? { rank: m.rank } : {}),
+    ...(m.rankSource ? { rankSource: m.rankSource } : {}),
+    ...(m.rankRationale ? { rankRationale: m.rankRationale } : {}),
   }));
 }
 
@@ -134,8 +142,8 @@ export function createStudioServer({
   discoveryTimeoutMs = Number(process.env.GEMINI_DISCOVERY_TIMEOUT_MS || 20_000),
   overallDeadlineMs = Number(process.env.GEMINI_DEADLINE_MS || 300_000),
   attemptTimeoutMs = Number(process.env.GEMINI_ATTEMPT_TIMEOUT_MS || 285_000),
-  maxCandidates = Number(process.env.GEMINI_MAX_CANDIDATES || 4),
-  maxTotalRequests = Number(process.env.GEMINI_MAX_REQUESTS || 8),
+  maxCandidates = Number(process.env.GEMINI_MAX_CANDIDATES || 3),
+  maxTotalRequests = Number(process.env.GEMINI_MAX_REQUESTS || 6),
   maxRetriesPerCandidate = Number(process.env.GEMINI_MAX_RETRIES || 2),
   baseRetryDelayMs = Number(process.env.GEMINI_RETRY_BASE_MS || 600),
   maxRetryDelayMs = Number(process.env.GEMINI_RETRY_MAX_MS || 4_000),
@@ -235,6 +243,8 @@ export function createStudioServer({
           if (updated.geminiKeyChanged) {
             catalogService.invalidate();
             healthRegistry.syncKeyFingerprint(updated.keyFp);
+          } else if (updated.geminiConfigChanged) {
+            healthRegistry.invalidateVerified(updated.keyFp);
           }
           const health = computeHealthSnapshot(updated.settings);
           return sendJson(res, 200, {
@@ -564,11 +574,10 @@ export function createStudioServer({
           });
         }
 
-        fs.mkdirSync(dataDir, { recursive: true });
         const outFile = path.join(dataDir, "tts-output.wav");
-        const tmpWav = `${outFile}.${process.pid}.tmp`;
-        fs.writeFileSync(tmpWav, out.wav);
-        fs.renameSync(tmpWav, outFile);
+        await withDataDirLock(dataDir, async () => {
+          atomicWriteBufferSync(outFile, out.wav, { mode: 0o644 });
+        });
 
         return sendJson(res, 200, {
           ok: true,

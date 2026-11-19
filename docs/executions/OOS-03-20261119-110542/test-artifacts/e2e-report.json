@@ -1,0 +1,41 @@
+{
+  "executedAt": "2026-11-19T11:21:08.227Z",
+  "browserExecutable": "Google Chrome",
+  "devServerVerified": true,
+  "prodServerVerified": true,
+  "desktopMainWidthAt1650": 1394,
+  "darkContrast": {
+    "bodyContrast": 17.11,
+    "ctaContrast": 10.11
+  },
+  "lightContrast": {
+    "bodyContrast": 15.47,
+    "ctaContrast": 4.9
+  },
+  "widthsVerified": [
+    320,
+    375,
+    390,
+    430,
+    768,
+    1024,
+    1440,
+    1650,
+    1920
+  ],
+  "totalViewportTabAssertions": 36,
+  "consoleErrors": 0,
+  "pageErrors": 0,
+  "screenshots": [
+    "desktop-1650-dashboard.png",
+    "desktop-1650-script.png",
+    "desktop-1650-settings-light.png",
+    "desktop-1650-settings.png",
+    "desktop-1650-still.png",
+    "mobile-320-settings.png",
+    "mobile-390-dashboard.png",
+    "mobile-390-script.png",
+    "mobile-390-settings.png",
+    "mobile-390-still.png"
+  ]
+}

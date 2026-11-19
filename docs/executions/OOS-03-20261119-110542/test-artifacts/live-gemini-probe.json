@@ -1,0 +1,15 @@
+{
+  "executedAt": "2026-11-19T11:36:30.817Z",
+  "status": "LIVE_BLOCKED",
+  "reason": "No configured Gemini API key in app/data/settings.json and GEMINI_API_KEY environment variable is not set on this runner.",
+  "hasSettingsFile": false,
+  "hasSavedKey": false,
+  "hasEnvKey": false,
+  "endpoints": {
+    "discover": "LIVE_BLOCKED",
+    "testConnection": "LIVE_BLOCKED",
+    "script": "LIVE_BLOCKED",
+    "checkStill": "LIVE_BLOCKED",
+    "tts": "LIVE_BLOCKED"
+  }
+}

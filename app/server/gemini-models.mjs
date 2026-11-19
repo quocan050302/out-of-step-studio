@@ -93,11 +93,23 @@ export function classifyGeminiModel(rawModel) {
     ? rawModel.supportedInputModalities.map((x) => String(x).toUpperCase())
     : null;
 
+  const hasTtsId = /-tts(?:-|$)/i.test(id);
+  const displayMentionsTts = /\btts\b|text-to-speech/i.test(displayName);
+  const explicitAudioOnly = Boolean(
+    explicitModalities && explicitModalities.includes("AUDIO") && !explicitModalities.includes("TEXT"),
+  );
+  const explicitNoAudio = Boolean(explicitModalities && !explicitModalities.includes("AUDIO"));
+  const explicitNoText = Boolean(explicitModalities && !explicitModalities.includes("TEXT"));
+
   const isTts =
     supportsGenerateContent &&
-    (/-tts(?:-|$)/i.test(id) ||
-      /\btts\b|text-to-speech/i.test(displayName) ||
-      Boolean(explicitModalities && explicitModalities.includes("AUDIO") && !explicitModalities.includes("TEXT")));
+    !explicitNoAudio &&
+    (hasTtsId || explicitAudioOnly);
+
+  const misleadingDisplayName =
+    (displayMentionsTts && !isTts) ||
+    (/\bpro\b/i.test(displayName) && /-flash-lite(?:-|$)/i.test(id)) ||
+    (/\bflash-lite\b/i.test(displayName) && /-pro(?:-|$)/i.test(id));
 
   const isGemma = /^gemma-/i.test(id);
   const isExperimentalCodename =
@@ -138,21 +150,31 @@ export function classifyGeminiModel(rawModel) {
   else if (isVideoOrMusic) exclusionReason = "media_generation_only";
   else if (isTranscribeOnly) exclusionReason = "transcription_only";
   else if (isSpecializedAgent) exclusionReason = "specialized_agent";
+  else if (!isTts && explicitNoText) exclusionReason = "unsupported_output_modality";
 
   const isCanonicalTier = tier === "pro" || tier === "flash" || tier === "flash-lite";
-  const textEligible = exclusionReason === null && !isTts && isCanonicalTier;
+  const textEligible = exclusionReason === null && !isTts && !explicitNoText && isCanonicalTier;
 
   const legacyTextOnly = /^gemini-1\.0-pro(?:-|$)/i.test(id) || id === "gemini-pro";
   const explicitlyNoImage =
     /\btext-only\b/i.test(metaText) ||
     Boolean(explicitInputModalities && !explicitInputModalities.includes("IMAGE"));
-  const visionTokenEligible = inputTokenLimit === null || inputTokenLimit >= 32768;
+  const hasExplicitImageInput = Boolean(explicitInputModalities && explicitInputModalities.includes("IMAGE"));
+  // Conservative vision eligibility: require either explicit IMAGE input modality or known >=32k multimodal token limit.
+  const visionTokenEligible = hasExplicitImageInput || (inputTokenLimit !== null && inputTokenLimit >= 32768);
   const visionEligible =
     textEligible && !legacyTextOnly && !explicitlyNoImage && visionTokenEligible;
 
   const ttsEligible = exclusionReason === null && isTts;
 
   const costTier = tier === "pro" ? "high" : tier === "flash" ? "standard" : "low";
+  const hasKnownMetadata = inputTokenLimit !== null || explicitModalities !== null || explicitInputModalities !== null;
+  const capabilityConfidence =
+    misleadingDisplayName || !hasKnownMetadata
+      ? "low"
+      : explicitModalities || explicitInputModalities
+        ? "high"
+        : "medium";
 
   return {
     id,
@@ -174,6 +196,9 @@ export function classifyGeminiModel(rawModel) {
     isDeprecated,
     isTts,
     costTier,
+    candidateOnly: true,
+    verificationState: "unverified_candidate",
+    capabilityConfidence,
     exclusionReason:
       exclusionReason ||
       (!isTts && !isCanonicalTier ? (isGemma ? "open_weights_gemma" : "non_canonical_tier") : null),
@@ -226,10 +251,15 @@ export function rankGeminiModels(
     return a.id.localeCompare(b.id);
   });
 
-  return scored.map((m, index) => ({
-    ...m,
-    rank: index + 1,
-  }));
+  return scored.map((m, index) => {
+    const stabilityLabel = m.isStable ? (m.isRollingAlias ? "rolling-alias" : "versioned-stable") : "preview";
+    return {
+      ...m,
+      rank: index + 1,
+      rankSource: "tier_heuristic_candidate",
+      rankRationale: `policy=${policy}; capability=${capability}; tier=${m.tier}; stability=${stabilityLabel}; family=${m.familyVersion || "rolling"} (catalog candidate only; runtime probe verifies execution)`,
+    };
+  });
 }
 
 function parseRetryDelayMsFromPayload(json, retryAfterHeader) {
@@ -274,6 +304,8 @@ export async function fetchGeminiModelCatalog(
   const seenTokens = new Set();
   let pageToken = "";
   let pagesFetched = 0;
+  let loopDetected = false;
+  let paginationTruncated = false;
 
   while (pagesFetched < MAX_DISCOVERY_PAGES) {
     if (signal?.aborted) {
@@ -339,7 +371,15 @@ export async function fetchGeminiModelCatalog(
     }
 
     const next = typeof json?.nextPageToken === "string" ? json.nextPageToken.trim() : "";
-    if (!next || seenTokens.has(next)) break;
+    if (!next) break;
+    if (seenTokens.has(next)) {
+      loopDetected = true;
+      break;
+    }
+    if (pagesFetched >= MAX_DISCOVERY_PAGES) {
+      paginationTruncated = true;
+      break;
+    }
     seenTokens.add(next);
     pageToken = next;
   }
@@ -350,6 +390,8 @@ export async function fetchGeminiModelCatalog(
     models,
     pagesFetched,
     totalDiscovered: models.length,
+    loopDetected,
+    paginationTruncated,
   };
 }
 
@@ -384,12 +426,36 @@ export function createModelCatalogService({
     };
   }
 
+  function awaitWithSignal(promise, signal) {
+    if (!signal) return promise;
+    if (signal.aborted) {
+      return Promise.reject(new DOMException("Operation aborted", "AbortError"));
+    }
+    return new Promise((resolve, reject) => {
+      const onAbort = () => reject(new DOMException("Operation aborted", "AbortError"));
+      signal.addEventListener("abort", onAbort, { once: true });
+      promise.then(
+        (val) => {
+          signal.removeEventListener("abort", onAbort);
+          resolve(val);
+        },
+        (err) => {
+          signal.removeEventListener("abort", onAbort);
+          reject(err);
+        },
+      );
+    });
+  }
+
   async function listGeminiModels(apiKey, { signal, forceRefresh = false } = {}) {
     const cleanKey = String(apiKey || "").trim();
     if (!cleanKey) {
       const err = new Error("No Gemini API key saved. Add one in Settings.");
       err.code = "NO_API_KEY";
       throw err;
+    }
+    if (signal?.aborted) {
+      throw new DOMException("Operation aborted", "AbortError");
     }
     const fp = keyFingerprint(cleanKey);
     const now = clock();
@@ -402,17 +468,15 @@ export function createModelCatalogService({
     }
 
     const inflightKey = fp;
-    if (!forceRefresh && inflightByKey.has(inflightKey)) {
-      const shared = await inflightByKey.get(inflightKey);
-      if (signal?.aborted) throw new DOMException("Operation aborted", "AbortError");
-      return { ...shared, fromCache: true, coalesced: true };
+    if (inflightByKey.has(inflightKey)) {
+      const shared = await awaitWithSignal(inflightByKey.get(inflightKey), signal);
+      return { ...shared, fromCache: !forceRefresh, coalesced: true };
     }
 
     const promise = (async () => {
       const fetched = await fetchGeminiModelCatalog(cleanKey, {
         baseUrl,
         fetchImpl,
-        signal: forceRefresh ? signal : undefined,
         timeoutMs,
         pageSize,
       });
@@ -421,6 +485,8 @@ export function createModelCatalogService({
         models: fetched.models,
         totalDiscovered: fetched.totalDiscovered,
         pagesFetched: fetched.pagesFetched,
+        loopDetected: fetched.loopDetected,
+        paginationTruncated: fetched.paginationTruncated,
         syncedAt: clock(),
       };
       cacheByKey.set(fp, entry);
@@ -429,8 +495,7 @@ export function createModelCatalogService({
 
     inflightByKey.set(inflightKey, promise);
     try {
-      const out = await promise;
-      if (signal?.aborted) throw new DOMException("Operation aborted", "AbortError");
+      const out = await awaitWithSignal(promise, signal);
       return { ...out, fromCache: false };
     } finally {
       if (inflightByKey.get(inflightKey) === promise) {

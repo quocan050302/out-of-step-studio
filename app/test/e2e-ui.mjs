@@ -14,6 +14,10 @@ const APP_DIR = path.resolve(__dirname, "..");
 
 const BROWSER_CANDIDATES = [
   process.env.BROWSER_EXE,
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
   "C:/Program Files/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
   "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
@@ -197,14 +201,25 @@ function createMockFetch() {
 async function main() {
   const browserExe = findBrowserExecutable();
   if (!browserExe) {
-    console.log("SKIP e2e-ui: No local Chrome/Edge/Chromium binary found.");
-    process.exit(0);
+    if (process.env.ALLOW_E2E_SKIP === "1") {
+      console.log("SKIP e2e-ui: No local Chrome/Edge/Chromium binary found (ALLOW_E2E_SKIP=1).");
+      process.exit(0);
+    }
+    console.error("FAIL e2e-ui: No local Chrome/Edge/Chromium binary found. Set BROWSER_EXE.");
+    process.exit(1);
   }
+
+  const ephemeralOutRoot =
+    !process.env.SCREENSHOT_DIR || !process.env.ARTIFACT_DIR
+      ? fs.mkdtempSync(path.join(os.tmpdir(), "oos-e2e-artifacts-"))
+      : null;
 
   const outShotsDir = process.env.SCREENSHOT_DIR
     ? path.resolve(process.env.SCREENSHOT_DIR)
-    : path.resolve(APP_DIR, "../docs/executions/OOS-UI-02-2026-11-19/screenshots/after");
-  const artDir = path.resolve(APP_DIR, "../docs/executions/OOS-UI-02-2026-11-19/test-artifacts");
+    : path.join(ephemeralOutRoot, "screenshots");
+  const artDir = process.env.ARTIFACT_DIR
+    ? path.resolve(process.env.ARTIFACT_DIR)
+    : path.join(ephemeralOutRoot, "test-artifacts");
   fs.mkdirSync(outShotsDir, { recursive: true });
   fs.mkdirSync(artDir, { recursive: true });
 
@@ -514,6 +529,9 @@ async function main() {
     await vite.close();
     await new Promise((resolve) => studio.server.close(resolve));
     fs.rmSync(tempDataDir, { recursive: true, force: true });
+    if (ephemeralOutRoot) {
+      fs.rmSync(ephemeralOutRoot, { recursive: true, force: true });
+    }
   }
 }
 

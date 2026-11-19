@@ -63,6 +63,7 @@ export function redactSecrets(input, extraSecrets = []) {
     }
   }
   text = text.replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED_API_KEY]");
+  text = text.replace(/([?&]key=)[^&\s"']+/gi, "$1[REDACTED_API_KEY]");
   return text;
 }
 
@@ -115,14 +116,32 @@ export function loadSettings(dataDir) {
   }
 }
 
-function atomicWriteJsonSync(filePath, obj) {
+export function atomicWriteBufferSync(filePath, buffer, { mode = 0o600 } = {}) {
   const dir = path.dirname(filePath);
   fs.mkdirSync(dir, { recursive: true });
   const nonce = crypto.randomBytes(6).toString("hex");
   const tmpFile = `${filePath}.${process.pid}.${nonce}.tmp`;
-  const payload = JSON.stringify(obj, null, 2);
-  fs.writeFileSync(tmpFile, payload, { encoding: "utf8", mode: 0o600 });
-  fs.renameSync(tmpFile, filePath);
+  try {
+    fs.writeFileSync(tmpFile, buffer, { mode });
+    fs.renameSync(tmpFile, filePath);
+    try {
+      fs.chmodSync(filePath, mode);
+    } catch {
+      // Ignore chmod errors on platforms/filesystems without POSIX permissions
+    }
+  } catch (err) {
+    try {
+      fs.rmSync(tmpFile, { force: true });
+    } catch {
+      // Ignore cleanup error
+    }
+    throw err;
+  }
+}
+
+function atomicWriteJsonSync(filePath, obj) {
+  const payload = Buffer.from(JSON.stringify(obj, null, 2), "utf8");
+  atomicWriteBufferSync(filePath, payload, { mode: 0o600 });
 }
 
 export function withDataDirLock(dataDir, fn) {
@@ -154,6 +173,14 @@ export async function updateProviderSettings(dataDir, provider, fields) {
   return withDataDirLock(dataDir, async () => {
     const current = loadSettings(dataDir);
     const prevKeyFp = keyFingerprint(current.gemini.apiKey);
+    const prevGeminiConfigSig = JSON.stringify({
+      selectionMode: current.gemini.selectionMode,
+      modelPolicy: current.gemini.modelPolicy,
+      includePreview: current.gemini.includePreview,
+      textModel: current.gemini.textModel,
+      visionModel: current.gemini.visionModel,
+      ttsModel: current.gemini.ttsModel,
+    });
     const allowed = ALLOWED_PROVIDER_FIELDS[provider];
 
     for (const [k, v] of Object.entries(fields)) {
@@ -197,9 +224,18 @@ export async function updateProviderSettings(dataDir, provider, fields) {
 
     const saved = saveSettings(dataDir, current);
     const nextKeyFp = keyFingerprint(saved.gemini.apiKey);
+    const nextGeminiConfigSig = JSON.stringify({
+      selectionMode: saved.gemini.selectionMode,
+      modelPolicy: saved.gemini.modelPolicy,
+      includePreview: saved.gemini.includePreview,
+      textModel: saved.gemini.textModel,
+      visionModel: saved.gemini.visionModel,
+      ttsModel: saved.gemini.ttsModel,
+    });
     return {
       settings: saved,
       geminiKeyChanged: prevKeyFp !== nextKeyFp,
+      geminiConfigChanged: prevGeminiConfigSig !== nextGeminiConfigSig,
       keyFp: nextKeyFp,
     };
   });
