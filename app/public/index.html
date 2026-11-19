@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Out of Step — Studio</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">OS</div>
+      <div>
+        <div class="brand-name">Out of Step</div>
+        <div class="brand-sub">Cartoon Studio</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" data-panel="dashboard">Dashboard</button>
+      <button class="nav-item" data-panel="script">Script</button>
+      <button class="nav-item" data-panel="still">Still Check</button>
+      <button class="nav-item" data-panel="settings">Settings</button>
+    </nav>
+    <div class="sidebar-foot">
+      <button id="theme-toggle" class="ghost-btn" type="button">Light mode</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- Dashboard -->
+    <section id="panel-dashboard" class="panel active">
+      <header class="panel-head">
+        <h1>Dashboard</h1>
+        <span id="conn-pill" class="pill pill-unknown">Gemini: not tested</span>
+      </header>
+      <p class="lede">One pipeline, two kinds of steps: AI steps run on Gemini, the render itself is pure code.</p>
+      <div class="cards">
+        <article class="card">
+          <h2>Script</h2>
+          <p class="card-kind">AI · Gemini</p>
+          <p class="card-status" id="status-script">Generates timed narration beats from a topic.</p>
+        </article>
+        <article class="card">
+          <h2>Voice / TTS</h2>
+          <p class="card-kind">AI · Gemini · experimental</p>
+          <p class="card-status">Text-to-speech via the Gemini TTS model. Availability depends on your account.</p>
+        </article>
+        <article class="card">
+          <h2>Still Check</h2>
+          <p class="card-kind">AI · Gemini vision</p>
+          <p class="card-status" id="status-still">Vision QA on rendered frames: PASS / FAIL with issues.</p>
+        </article>
+        <article class="card">
+          <h2>Render</h2>
+          <p class="card-kind">Code · Remotion engine</p>
+          <p class="card-status">three.js inside Remotion. No AI — every frame is drawn by code. See <code>engine/</code>.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Script -->
+    <section id="panel-script" class="panel">
+      <header class="panel-head"><h1>Script</h1></header>
+      <p class="lede">Gemini writes narration beats in the Out of Step style. From this server a call can take 1–3 minutes — please wait after clicking Generate.</p>
+      <form id="script-form" class="form">
+        <label>Topic
+          <input id="script-topic" type="text" placeholder="a cowboy who learns to share" required>
+        </label>
+        <label>Duration
+          <select id="script-duration">
+            <option value="30">30 seconds</option>
+            <option value="60">60 seconds</option>
+          </select>
+        </label>
+        <button id="script-generate" class="primary-btn" type="submit">Generate script</button>
+      </form>
+      <div id="script-result" class="result"></div>
+    </section>
+
+    <!-- Still Check -->
+    <section id="panel-still" class="panel">
+      <header class="panel-head"><h1>Still Check</h1></header>
+      <p class="lede">Upload a rendered frame; Gemini vision returns a PASS / FAIL verdict with issues.</p>
+      <form id="still-form" class="form">
+        <label>Frame image
+          <input id="still-file" type="file" accept="image/*" required>
+        </label>
+        <img id="still-preview" class="still-preview" alt="" hidden>
+        <label>Shot note (what should this frame show?)
+          <input id="still-note" type="text" placeholder="front medium shot of the cowboy column marching in step">
+        </label>
+        <button id="still-check" class="primary-btn" type="submit">Check still</button>
+      </form>
+      <div id="still-result" class="result"></div>
+    </section>
+
+    <!-- Settings -->
+    <section id="panel-settings" class="panel">
+      <header class="panel-head"><h1>Settings</h1></header>
+      <p class="lede">Keys are stored only in a local file on this machine and are never committed to GitHub.</p>
+      <div id="provider-cards" class="cards cards-single"></div>
+    </section>
+  </main>
+</div>
+<script src="/app.js"></script>
+</body>
+</html>
