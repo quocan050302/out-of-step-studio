@@ -1,3 +1,22 @@
+## React + Vite Studio (frontend migration)
+
+The web Studio is now authored in **React + Vite** (see \`app/src/\`); its original Node API, all Gemini calls, Remotion video engine and Python audio pipeline stay in place.
+
+\`\`\`bash
+cd app
+npm install
+npm run dev          # http://127.0.0.1:5173; launches API :4173 as well
+npm test
+npm run build
+npm start            # production UI + API on http://localhost:4173
+\`\`\`
+
+Node.js 20.19+ required. Do not place API keys in \`VITE_*\` variables; save them through Settings. The server continues to mask keys and persist only in gitignored \`app/data/settings.json\`.
+
+Migration details and **verification still required**: [app/MIGRATION-REACT-VITE.md](app/MIGRATION-REACT-VITE.md).
+
+---
+
 # Out of Step — Cowboy Cartoon Short Studio
 
 **Out of Step** is a 30-second vertical (9:16) cartoon story short — twelve cowboys nearly
@@ -18,10 +37,10 @@ production pipeline.
 Every pixel of the film is drawn by code. Gemini is used only where a human used to sit:
 writing the script, voicing it, and eyeballing frames for QA.
 
-## Run the Studio app
+## Legacy Studio server (no frontend build)
 
 ```bash
-node app/server.mjs          # zero npm dependencies, Node 24
+node app/server.mjs          # Node API, serves Vite build if available
 # open http://localhost:4173  (PORT env var overrides 4173)
 ```
 

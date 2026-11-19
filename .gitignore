@@ -2,6 +2,7 @@ node_modules/
 remotion-tmp/
 out/
 app/data/
+app/dist/
 .env
 *.wav
 *.mp3

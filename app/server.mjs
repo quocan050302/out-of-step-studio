@@ -10,6 +10,9 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, "public");
+const BUILT_DIR = path.join(__dirname, "dist");
+// Use the Vite build in production, with the legacy assets as pre-build fallback.
+const STATIC_DIR = fs.existsSync(path.join(BUILT_DIR, "index.html")) ? BUILT_DIR : PUBLIC_DIR;
 const DATA_DIR = path.join(__dirname, "data");
 const SETTINGS_FILE = path.join(DATA_DIR, "settings.json");
 const PORT = Number(process.env.PORT || 4173);
@@ -152,6 +155,7 @@ const MIME = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
@@ -162,8 +166,8 @@ const MIME = {
 function serveStatic(req, res, urlPath) {
   let rel = urlPath === "/" ? "/index.html" : urlPath;
   rel = decodeURIComponent(rel.split("?")[0]);
-  const file = path.normalize(path.join(PUBLIC_DIR, rel));
-  if (!file.startsWith(PUBLIC_DIR) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
+  const file = path.resolve(STATIC_DIR, "." + rel);
+  if (!(file === STATIC_DIR || file.startsWith(STATIC_DIR + path.sep)) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
     res.writeHead(404, { "content-type": "text/plain" });
     res.end("Not found");
     return;
