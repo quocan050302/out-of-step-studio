@@ -1,0 +1,40 @@
+{
+  "capturedAt": "2026-11-19T09:12:14.939Z",
+  "baselineCommit": "ec4de1340bfedefa9b4dd98b9f9d37a9315be9ce",
+  "branch": "feat/studio-react-vite-migration",
+  "syntheticFixturesOnly": true,
+  "desktopMetrics": {
+    "viewport": {
+      "width": 1650,
+      "height": 960
+    },
+    "mainBoundingBox": {
+      "x": 232,
+      "y": 0,
+      "width": 980,
+      "height": 960
+    }
+  },
+  "mobileMetrics": {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "mainBoundingBox": {
+      "x": 0,
+      "y": 355.734375,
+      "width": 390,
+      "height": 735.96875
+    }
+  },
+  "screenshots": [
+    "desktop-1650-dashboard.png",
+    "desktop-1650-script.png",
+    "desktop-1650-settings.png",
+    "desktop-1650-still.png",
+    "mobile-390-dashboard.png",
+    "mobile-390-script.png",
+    "mobile-390-settings.png",
+    "mobile-390-still.png"
+  ]
+}

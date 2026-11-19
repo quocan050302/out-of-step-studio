@@ -1,0 +1,62 @@
+{
+  "executedAt": "2026-11-19T09:43:34.618Z",
+  "discovery": {
+    "ok": true,
+    "pagesFetched": 1,
+    "totalDiscovered": 65,
+    "topTextCandidates": [
+      "gemini-2.5-pro",
+      "gemini-pro-latest",
+      "gemini-3.8-flash",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash"
+    ],
+    "topVisionCandidates": [
+      "gemini-2.5-pro",
+      "gemini-pro-latest",
+      "gemini-3.8-flash",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash"
+    ],
+    "topTtsCandidates": [
+      "gemini-3.8-flash-tts",
+      "gemini-3.8-flash-lite-tts"
+    ]
+  },
+  "testConnection": {
+    "ok": true,
+    "preferredModel": "gemini-2.5-pro",
+    "effectiveModel": "gemini-3.5-flash-lite",
+    "downgraded": true,
+    "reason": "overload",
+    "reply": "OK",
+    "latencyMs": 2902,
+    "error": null,
+    "attemptedModels": [
+      {
+        "model": "gemini-2.5-pro",
+        "attempt": 1,
+        "statusCode": 404,
+        "classification": "unsupported",
+        "outcome": "failed",
+        "elapsedMs": 201
+      },
+      {
+        "model": "gemini-3.8-flash",
+        "attempt": 1,
+        "statusCode": 503,
+        "classification": "overload",
+        "outcome": "failed",
+        "elapsedMs": 1623
+      },
+      {
+        "model": "gemini-3.5-flash-lite",
+        "attempt": 1,
+        "statusCode": 200,
+        "classification": "ok",
+        "outcome": "success",
+        "elapsedMs": 974
+      }
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "executionId": "OOS-UI-02-2026-11-19",
+  "date": "2026-11-19",
+  "branch": "feat/studio-react-vite-migration",
+  "baselineCommit": "ec4de1340bfedefa9b4dd98b9f9d37a9315be9ce",
+  "secretsRedacted": true,
+  "syntheticScreenshotsOnly": true,
+  "artifacts": {
+    "plan": "docs/executions/OOS-UI-02-2026-11-19/PLAN.md",
+    "readme": "docs/executions/OOS-UI-02-2026-11-19/README.md",
+    "qaReport": "docs/executions/OOS-UI-02-2026-11-19/QA-REPORT.md",
+    "baselineSnapshot": "docs/executions/OOS-UI-02-2026-11-19/test-artifacts/baseline-snapshot.json",
+    "e2eReport": "docs/executions/OOS-UI-02-2026-11-19/test-artifacts/e2e-report.json",
+    "liveGeminiProbe": "docs/executions/OOS-UI-02-2026-11-19/test-artifacts/live-gemini-probe.json",
+    "beforeScreenshots": [
+      "screenshots/before/desktop-1650-dashboard.png",
+      "screenshots/before/desktop-1650-script.png",
+      "screenshots/before/desktop-1650-still.png",
+      "screenshots/before/desktop-1650-settings.png",
+      "screenshots/before/mobile-390-dashboard.png",
+      "screenshots/before/mobile-390-script.png",
+      "screenshots/before/mobile-390-still.png",
+      "screenshots/before/mobile-390-settings.png"
+    ],
+    "afterScreenshots": [
+      "screenshots/after/desktop-1650-dashboard.png",
+      "screenshots/after/desktop-1650-script.png",
+      "screenshots/after/desktop-1650-still.png",
+      "screenshots/after/desktop-1650-settings.png",
+      "screenshots/after/desktop-1650-settings-light.png",
+      "screenshots/after/mobile-390-dashboard.png",
+      "screenshots/after/mobile-390-script.png",
+      "screenshots/after/mobile-390-still.png",
+      "screenshots/after/mobile-390-settings.png",
+      "screenshots/after/mobile-320-settings.png"
+    ]
+  }
+}

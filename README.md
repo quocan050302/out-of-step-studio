@@ -1,19 +1,20 @@
-## React + Vite Studio (frontend migration)
+## React + Vite Studio (Navy–Gold UI + Gemini Auto Model Discovery & Fallback)
 
-The web Studio is now authored in **React + Vite** (see \`app/src/\`); its original Node API, all Gemini calls, Remotion video engine and Python audio pipeline stay in place.
+The web Studio is authored in **React + Vite** (`app/src/`) with a modular Node backend (`app/server.mjs` + `app/server/`). It automatically discovers accessible Gemini models via `GET /v1beta/models`, ranks eligible candidates by capability (`text`, `vision`, `tts`), and performs bounded exponential-backoff retries + graceful fallback on `503 UNAVAILABLE` overload — while keeping the Remotion video engine (`engine/`) and Python audio pipeline (`pipeline/`) completely untouched.
 
-\`\`\`bash
+```bash
 cd app
-npm install
-npm run dev          # http://127.0.0.1:5173; launches API :4173 as well
-npm test
-npm run build
+npm ci               # deterministic install from committed package-lock.json
+npm run dev          # http://127.0.0.1:5173 (Vite UI) + API on http://localhost:4173
+npm test             # unit + model ranking + 24 fallback scenarios + HTTP API tests
+npm run build        # production Vite bundle -> app/dist/
+npm run test:e2e     # headless Chromium E2E + responsive/contrast visual checks
 npm start            # production UI + API on http://localhost:4173
-\`\`\`
+```
 
-Node.js 20.19+ required. Do not place API keys in \`VITE_*\` variables; save them through Settings. The server continues to mask keys and persist only in gitignored \`app/data/settings.json\`.
+Node.js 20.19+ required. Do not place API keys in `VITE_*` variables; save them through **Settings**. Keys remain masked in all API responses and are persisted exclusively in gitignored `app/data/settings.json`.
 
-Migration details and **verification still required**: [app/MIGRATION-REACT-VITE.md](app/MIGRATION-REACT-VITE.md).
+Migration & verification details: [app/MIGRATION-REACT-VITE.md](app/MIGRATION-REACT-VITE.md), [app/VERIFY.md](app/VERIFY.md), and [docs/executions/OOS-UI-02-2026-11-19/README.md](docs/executions/OOS-UI-02-2026-11-19/README.md).
 
 ---
 

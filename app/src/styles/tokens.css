@@ -1,0 +1,206 @@
+/* Out of Step Studio — Design System Tokens (Navy–Gold Dark Default + Balanced Light) */
+
+:root,
+html[data-theme="dark"] {
+  --bg-canvas: #081321;
+  --bg-subtle: #0b1728;
+  --bg-sidebar: #101d30;
+  --bg-topbar: rgba(11, 23, 40, 0.92);
+  --bg-surface: #13233a;
+  --bg-raised: #182a43;
+  --bg-hover: #1e3352;
+  --bg-input: #0d1b2e;
+
+  --border-subtle: #213247;
+  --border: #2c3d55;
+  --border-strong: #3e5575;
+
+  --accent: #e9b75d;
+  --accent-hover: #f3c673;
+  --accent-muted: #dca85b;
+  --accent-tint: rgba(233, 183, 93, 0.14);
+  --accent-border: rgba(233, 183, 93, 0.38);
+  --accent-text: #0a1320;
+
+  --text: #f4f5f7;
+  --text-secondary: #a5b4c7;
+  --text-muted: #8b9eb7;
+
+  --ok: #2dd4a0;
+  --ok-bg: rgba(45, 212, 160, 0.12);
+  --ok-border: rgba(45, 212, 160, 0.36);
+
+  --warn: #f5b041;
+  --warn-bg: rgba(245, 176, 65, 0.13);
+  --warn-border: rgba(245, 176, 65, 0.38);
+
+  --bad: #f2746b;
+  --bad-bg: rgba(242, 116, 107, 0.13);
+  --bad-border: rgba(242, 116, 107, 0.4);
+
+  --info: #68b5f6;
+  --info-bg: rgba(104, 181, 246, 0.13);
+  --info-border: rgba(104, 181, 246, 0.36);
+
+  --shadow-sm: 0 2px 8px rgba(3, 9, 18, 0.28);
+  --shadow-md: 0 10px 28px rgba(3, 9, 18, 0.38);
+
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --bg-canvas: #eef2f7;
+  --bg-subtle: #e5ebf3;
+  --bg-sidebar: #e2e8f1;
+  --bg-topbar: rgba(238, 242, 247, 0.94);
+  --bg-surface: #fafbfd;
+  --bg-raised: #f1f5fa;
+  --bg-hover: #e5ecf5;
+  --bg-input: #ffffff;
+
+  --border-subtle: #d6dfec;
+  --border: #c3cfe0;
+  --border-strong: #9bb0ca;
+
+  --accent: #9a6612;
+  --accent-hover: #7f530d;
+  --accent-muted: #b2791b;
+  --accent-tint: rgba(154, 102, 18, 0.11);
+  --accent-border: rgba(154, 102, 18, 0.34);
+  --accent-text: #ffffff;
+
+  --text: #0d1b2a;
+  --text-secondary: #394b61;
+  --text-muted: #50637a;
+
+  --ok: #0d7a55;
+  --ok-bg: rgba(13, 122, 85, 0.1);
+  --ok-border: rgba(13, 122, 85, 0.32);
+
+  --warn: #995606;
+  --warn-bg: rgba(153, 86, 6, 0.1);
+  --warn-border: rgba(153, 86, 6, 0.32);
+
+  --bad: #b62d25;
+  --bad-bg: rgba(182, 45, 37, 0.09);
+  --bad-border: rgba(182, 45, 37, 0.34);
+
+  --info: #175ea6;
+  --info-bg: rgba(23, 94, 166, 0.1);
+  --info-border: rgba(23, 94, 166, 0.3);
+
+  --shadow-sm: 0 2px 8px rgba(13, 27, 42, 0.06);
+  --shadow-md: 0 10px 26px rgba(13, 27, 42, 0.1);
+
+  color-scheme: light;
+}
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+
+  --radius-sm: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: var(--bg-canvas);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  color: var(--text);
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+h1 {
+  font-size: clamp(1.45rem, 1.2rem + 0.8vw, 1.85rem);
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 1.15rem;
+  font-weight: 650;
+}
+
+h3 {
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  padding: 2px 6px;
+  border-radius: 6px;
+  word-break: break-word;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

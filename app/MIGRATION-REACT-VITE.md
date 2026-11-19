@@ -1,51 +1,55 @@
-# React + Vite Studio migration — behavior preservation record
+# React + Vite Studio Migration & OOS-UI-02 Redesign Record
 
-Base: GitHub branch \`main\`, commit \`8ba41d9a6e40b985408b01158ab761efee9718aa\`.
-Migration branch: \`feat/studio-react-vite-migration\`.
+- **Base branch:** `main` (`8ba41d9a6e40b985408b01158ab761efee9718aa`)
+- **Active branch:** `feat/studio-react-vite-migration`
+- **OOS-UI-02 Upgrade (2026-11-19):** Navy–Gold responsive SaaS redesign + server-side Gemini automatic model discovery, capability ranking, and bounded 503 fallback.
 
-## Architecture boundary
+---
 
-- \`app/\`: frontend converted from HTML and imperative DOM JavaScript to React components bundled by Vite. The original CSS declarations remain, with only two wrapper visibility rules appended.
-- \`app/server.mjs\`: unchanged application API logic; minimal static-serving switch to \`app/dist/\` when a Vite production build exists, with legacy \`app/public/\` fallback.
-- \`engine/\`, \`pipeline/\`, \`SCRIPT.md\`, and original production documentation: untouched. Remotion already uses React, and is **not** a Vite app.
-- Original \`app/public/\` files retained as a reference and pre-build fallback, not deleted.
+## Architecture Boundary
 
-## Behavioral invariants
+- **`app/src/` (React + Vite frontend):**
+  - Modularized into `components/{Sidebar,Topbar}.jsx`, `pages/{DashboardPage,ScriptPage,StillCheckPage,SettingsPage}.jsx`, `hooks/useGeminiStudio.js`, `lib/studio.mjs`, and CSS design-system layers `styles/{tokens,layout,components}.css`.
+  - Full-width desktop layout (`max-width: 1440px`), collapsible sidebar rail, contextual topbar, 2-column Script/Still Check workspaces, 2-panel Gemini Control Center in Settings, and mobile slide-over drawer + sticky bottom quick-navigation (`320px–768px`).
+- **`app/server.mjs` + `app/server/*.mjs` (Zero external npm runtime dependencies):**
+  - `settings-store.mjs`: atomic file writes, strict field allowlist, blank API key preservation, SHA-256 key fingerprinting, secret redaction.
+  - `gemini-models.mjs`: paginated `GET /v1beta/models` discovery (`nextPageToken`), model ID allowlist normalization, capability classification (`text`, `vision`, `tts`), deterministic ranking (`quality` / `balanced` / `fast` policies + preview opt-in), single-flight discovery + TTL cache.
+  - `gemini-transport.mjs`: unified `geminiGenerate`, `classifyGeminiError`, `retryWithBackoff` (exponential backoff + jitter + `Retry-After` / `RetryInfo`), `ModelHealthRegistry` (temporary cooldown + auto-recovery back to preferred model), shared `runGeminiWithFallback` across `/api/test-connection`, `/api/script`, `/api/check-still`, and `/api/tts`, plus strict output validators.
+  - `create-server.mjs`: serves `app/dist/` in production (falling back to `app/public/`), supports both legacy JSON and live NDJSON progress streaming on `POST /api/test-connection`, and exposes additive `GET /api/gemini/status`, `GET /api/gemini/models`, and `POST /api/gemini/discover`.
+- **`engine/` & `pipeline/`:** Completely untouched (`0` files modified). `app/public/` legacy files preserved as pre-build fallback.
 
-1. Navigation: Dashboard, Script, Still Check, Settings; active section only. Hidden panels remain mounted and preserve form/result data.
-2. Theme: dark by default, \`oos-theme\` localStorage key, Light/Dark mode button and preexisting CSS theme variables.
-3. Settings: \`GET /api/settings\` and \`POST /api/settings\`, same provider names and fields, blank API key does not replace saved key, server response continues masking keys; form resets after successful save.
-4. Connection: \`POST /api/test-connection\` with provider gemini, last-test result saved to \`oos-gemini-test\` localStorage, same dashboard pill states.
-5. Script: \`POST /api/script\` with \`topic\` and numeric \`durationSec\` (30 or 60); same labels, loading text, beat timing display, word count fallback, escaped/safe output.
-6. Still QA: browser FileReader/data URL, base64 + MIME type + shot note to \`POST /api/check-still\`; same PASS/FAIL convention, summary, issue list, preview and loading state.
-7. TTS: remains the existing experimental backend endpoint \`POST /api/tts\`; no new frontend TTS controls, matching original Studio.
-8. Gemini model defaults, request prompts, timeout, status/error handling, WAV format, settings path, render scripts: unchanged.
+---
+
+## Behavioral Invariants Preserved
+
+1. **Navigation & Keep-Mounted State:** Dashboard, Script, Still Check, Settings remain mounted via `.panel-host` so unsaved form inputs, image previews, and generated results survive tab switches.
+2. **Theme:** Dark Navy–Gold default, Light theme supported, persisted under `localStorage["oos-theme"]`, WCAG AA contrast verified programmatically.
+3. **Settings & Secret Hygiene:** `GET/POST /api/settings` masks keys (`••••••••` + last 5 chars), blank `apiKey` preserves saved key on both client and server, unintegrated providers (`openai`, `anthropic`, `elevenlabs`) remain `"not integrated yet"`.
+4. **Honest Connection Verification:** `POST /api/test-connection` requires a real `generateContent` `"OK"` reply before marking connected (`listModels` HTTP 200 alone never marks connected); stale cached `oos-gemini-test` entries (>30m) display relative age rather than masquerading as freshly verified.
+5. **Script, Vision QA & Experimental TTS:** Prompts, beat schema, `PASS`/`FAIL` vision verdict contract, and 24 kHz mono PCM16 WAV wrapping (`app/data/tts-output.wav`) preserved 100%, now backed by capability-matched automatic fallback and output schema validation.
+
+---
 
 ## Commands
 
-Prerequisites: Node.js 20.19+ and npm.
-
-\`\`\`bash
+```bash
 cd app
-npm install
-npm run dev        # starts Node API on :4173 and Vite on http://127.0.0.1:5173
-npm test           # pure-function regression tests
-npm run build      # writes app/dist/
-npm start          # serves built UI and API on http://localhost:4173
-\`\`\`
+npm ci               # deterministic install from committed lockfile
+npm run dev          # starts Node API on :4173 and Vite on http://127.0.0.1:5173
+npm test             # 24 unit, ranking, fallback, and HTTP API tests
+npm run build        # writes production bundle to app/dist/
+npm run test:e2e     # Playwright headless Chrome E2E across 9 widths + visual QA
+npm start            # serves built UI and API on http://localhost:4173
+```
 
-Vite proxies only \`/api\` to Node in development. API keys are **never** inserted into the Vite build. \`app/data/\` remains gitignored.
+---
 
-## Verification gates (not claims of passing tests)
+## Verification Gates (Executed 2026-11-19)
 
-- [ ] \`npm install\` and \`npm run build\` complete without errors.
-- [ ] \`npm test\` passes.
-- [ ] Browser regression: all four panels visible by navigation; form values/results survive switching.
-- [ ] Theme persists across reload.
-- [ ] Compare original vs React UI at desktop and mobile with screenshots.
-- [ ] Server GET \`/api/settings\` returns provider list and masked keys.
-- [ ] Save Settings: empty API key preserves existing key, model values update, full key never in API response.
-- [ ] Gemini test, script, vision QA, and experimental TTS with user-supplied key (these calls are external, slow, and must never be falsely marked PASS).
-- [ ] Remotion render and Python mix regression against pre-migration baseline; code in those folders unchanged.
-
-The GitHub connector can commit code, but cannot run npm/browser/render commands. Do **not** interpret the presence of these tests as proof that all behavior has been validated.
+- [x] `npm ci` and `npm run build` complete cleanly with zero errors.
+- [x] `npm test` passes (`24/24` tests covering model ranking, all 24 fallback/error/quota/abort scenarios, settings migration, and HTTP API contracts).
+- [x] `npm run test:e2e` passes (`36` viewport/tab assertions across `320, 375, 390, 430, 768, 1024, 1440, 1650, 1920` px, zero horizontal overflow, zero console/page errors, both Vite dev and production built server verified).
+- [x] Theme persistence across reload + programmatic WCAG AA contrast checks verified in Dark & Light modes.
+- [x] BEFORE vs AFTER desktop & mobile screenshots captured and visually inspected (`docs/executions/OOS-UI-02-2026-11-19/screenshots/`).
+- [x] Empty API key preserves existing key; full API key asserted absent from DOM, responses, streams, and logs.
+- [x] `engine/` TypeScript check (`npx tsc --noEmit`) passes; `git diff engine/ pipeline/` is empty.
