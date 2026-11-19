@@ -4,6 +4,7 @@
 - **Repository:** `https://github.com/quocan050302/out-of-step-studio`
 - **Branch triển khai duy nhất:** `feat/studio-react-vite-migration`
 - **Baseline Commit SHA:** `3958dc6ed94ee1e3ad71fab14c9f4606c1f8d638`
+- **Implementation Commit SHA:** `fa27bed5d165bf868d3823432cd2eefa7c16f48e`
 - **Execution Folder:** `docs/executions/OOS-03-20261119-110542/` (Bảo toàn nguyên vẹn `docs/executions/OOS-UI-02-2026-11-19/` với `0` file bị ghi đè).
 
 ---
